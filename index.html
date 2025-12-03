@@ -35,7 +35,7 @@
         .time-display { font-size: 14px; color: #fff; font-weight: 500; min-width: 150px; text-align: center; }
         .timeline-container { display: flex; align-items: center; gap: 8px; }
         .timeline { width: 180px; height: 4px; background: #555; border-radius: 2px; cursor: pointer; position: relative; }
-        .timeline-bar { height: 100%; background: #00d4ff; border-radius: 2px; width: 0%; position: relative; }
+        .timeline-bar { height: 100%; background: #00d4ff; border-radius: 2px; width: 0%; position: relative; transition: width 0.1s linear; }
         .timeline-handle { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .fps-display { display: flex; align-items: center; gap: 4px; color: #aaa; font-size: 13px; }
         .fps-icon { font-size: 16px; }
@@ -76,6 +76,9 @@
         .download-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3); }
         .download-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .download-btn .icon { font-size: 1.1rem; }
+        .loading-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(15, 20, 25, 0.9); padding: 20px 30px; border-radius: 10px; z-index: 2000; text-align: center; }
+        .loading-spinner { width: 40px; height: 40px; border: 3px solid #2f3942; border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -101,10 +104,14 @@
         </header>
         <div class="map-area">
             <div id="map"></div>
+            <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+                <div class="loading-spinner"></div>
+                <div id="loadingText">Carregando imagens...</div>
+            </div>
             <iframe id="externalRadar" src=""></iframe>
             <div class="controls" id="controls">
                 <button class="ctrl-btn" id="prevBtn">⏪</button>
-                <button class="ctrl-btn" id="playBtn">⏸</button>
+                <button class="ctrl-btn" id="playBtn">▶</button>
                 <button class="ctrl-btn" id="nextBtn">⏩</button>
                 <div class="time-display" id="timeDisplay">Carregando...</div>
                 <div class="timeline-container">
@@ -117,7 +124,7 @@
                 </div>
                 <div class="fps-display">
                     <span class="fps-icon">⏱</span>
-                    <span>2fps</span>
+                    <span>1.5fps</span>
                 </div>
             </div>
         </div>
@@ -192,17 +199,11 @@
     <canvas id="analysisCanvas" style="display:none;"></canvas>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Fullscreen toggle
-        let isFullscreen = false;
-        document.getElementById('fullscreenBtn').onclick = function() {
-            isFullscreen = !isFullscreen;
-            document.getElementById('container').classList.toggle('fullscreen', isFullscreen);
-            document.getElementById('fullscreenIcon').textContent = isFullscreen ? '⊟' : '⛶';
-            document.getElementById('fullscreenText').textContent = isFullscreen ? 'Recolher' : 'Expandir';
-            this.classList.toggle('active', isFullscreen);
-            setTimeout(() => map.invalidateSize(), 350);
-        };
-
+        // Configurações
+        const ANIMATION_SPEED = 650; // ms entre frames
+        const BASE_OPACITY = 0.7;
+        const HIGH_OPACITY = 0.9;
+        
         // Configurações dos radares
         const RADAR_CONFIG = {
             mendanha: {
@@ -233,11 +234,26 @@
             topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap' })
         };
         
-        let map, imageOverlay, radarMarker, arrowsLayer, currentTileLayer;
+        let map, radarMarker, arrowsLayer, currentTileLayer;
         let frames = [], currentFrame = 0, isPlaying = false, playInterval;
-        let currentOpacity = 0.7, showArrows = true;
+        let currentOpacity = BASE_OPACITY, showArrows = true;
         let allFramesData = { mendanha: [], sumare: [] };
         let currentRadar = 'mendanha';
+        
+        // Array de overlays pré-carregados (um para cada frame)
+        let frameOverlays = [];
+        let imagesReady = false;
+
+        // Fullscreen toggle
+        let isFullscreen = false;
+        document.getElementById('fullscreenBtn').onclick = function() {
+            isFullscreen = !isFullscreen;
+            document.getElementById('container').classList.toggle('fullscreen', isFullscreen);
+            document.getElementById('fullscreenIcon').textContent = isFullscreen ? '⊟' : '⛶';
+            document.getElementById('fullscreenText').textContent = isFullscreen ? 'Recolher' : 'Expandir';
+            this.classList.toggle('active', isFullscreen);
+            setTimeout(() => map.invalidateSize(), 350);
+        };
 
         function createArrowIcon(angle) {
             const svg = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
@@ -262,6 +278,97 @@
         
         radarMarker = L.marker(RADAR_CONFIG.mendanha.markerPos).bindPopup(RADAR_CONFIG.mendanha.markerName);
         arrowsLayer = L.layerGroup().addTo(map);
+
+        // Criar todos os overlays de uma vez
+        async function createAllOverlays(radar) {
+            const config = RADAR_CONFIG[radar];
+            
+            // Limpar overlays anteriores
+            frameOverlays.forEach(overlay => {
+                if (overlay) map.removeLayer(overlay);
+            });
+            frameOverlays = [];
+            imagesReady = false;
+            
+            // Mostrar loading
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.getElementById('loadingText').textContent = 'Carregando imagens... 0/' + frames.length;
+            
+            let loadedCount = 0;
+            
+            // Criar um overlay para cada frame
+            for (let i = 0; i < frames.length; i++) {
+                const filename = frames[i];
+                const url = config.apiFrame + filename;
+                
+                // Pré-carregar a imagem
+                await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        loadedCount++;
+                        document.getElementById('loadingText').textContent = 'Carregando imagens... ' + loadedCount + '/' + frames.length;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        loadedCount++;
+                        resolve();
+                    };
+                    img.src = url;
+                });
+                
+                // Criar overlay com opacidade 0 (invisível)
+                const overlay = L.imageOverlay(url, config.bounds, { opacity: 0 });
+                overlay.addTo(map);
+                frameOverlays.push(overlay);
+            }
+            
+            // Mostrar primeiro frame
+            if (frameOverlays.length > 0) {
+                frameOverlays[0].setOpacity(currentOpacity);
+            }
+            
+            imagesReady = true;
+            document.getElementById('loadingOverlay').style.display = 'none';
+            console.log(`${radar}: ${frameOverlays.length} overlays criados`);
+        }
+
+        // Mostrar frame (apenas alterna opacidade)
+        function showFrame(index) {
+            if (frames.length === 0 || !imagesReady || frameOverlays.length === 0) return;
+            
+            // Esconder frame atual
+            if (frameOverlays[currentFrame]) {
+                frameOverlays[currentFrame].setOpacity(0);
+            }
+            
+            currentFrame = index;
+            
+            // Mostrar novo frame
+            if (frameOverlays[currentFrame]) {
+                frameOverlays[currentFrame].setOpacity(currentOpacity);
+            }
+            
+            // Atualizar UI
+            const frameNum = (index + 1) + '/' + frames.length;
+            document.getElementById('frameCounter').textContent = frameNum;
+            document.getElementById('timelineBar').style.width = ((index + 1) / frames.length * 100) + '%';
+            
+            const filename = frames[index];
+            
+            if (currentRadar === 'mendanha') {
+                document.getElementById('currentFrameNum').textContent = frameNum;
+                const match = filename.match(/MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
+                if (match) {
+                    document.getElementById('timeDisplay').textContent = match[3] + '/' + match[2] + '/' + match[1] + ', ' + match[4] + ':' + match[5] + ':00';
+                }
+            } else if (currentRadar === 'sumare') {
+                document.getElementById('sumareFrameNum').textContent = frameNum;
+                const now = new Date();
+                document.getElementById('timeDisplay').textContent = now.toLocaleDateString('pt-BR') + ', ' + now.toLocaleTimeString('pt-BR');
+            }
+            
+            drawArrowsForFrame(index);
+        }
 
         // Download GIF
         document.getElementById('downloadGif').onclick = async function() {
@@ -346,15 +453,14 @@
                         document.getElementById('mendanhaInfo').style.display = 'block';
                         document.getElementById('sumareInfo').style.display = 'none';
                         document.getElementById('dcnitInfo').style.display = 'none';
-                        loadFrames('mendanha');
                     } else if (currentRadar === 'sumare') {
                         document.getElementById('radarTitle').textContent = 'Radar Sumaré';
                         document.getElementById('mendanhaInfo').style.display = 'none';
                         document.getElementById('sumareInfo').style.display = 'block';
                         document.getElementById('dcnitInfo').style.display = 'none';
-                        loadFrames('sumare');
                     }
                     
+                    loadFrames(currentRadar);
                     map.invalidateSize();
                 }
             };
@@ -387,8 +493,11 @@
 
         document.getElementById('toggleOpacity').onclick = function() {
             this.classList.toggle('active');
-            currentOpacity = this.classList.contains('active') ? 0.9 : 0.7;
-            if (imageOverlay) imageOverlay.setOpacity(currentOpacity);
+            currentOpacity = this.classList.contains('active') ? HIGH_OPACITY : BASE_OPACITY;
+            // Atualizar opacidade do frame atual
+            if (frameOverlays[currentFrame]) {
+                frameOverlays[currentFrame].setOpacity(currentOpacity);
+            }
         };
 
         function detectNuclei(imageData, width, height) {
@@ -469,7 +578,7 @@
             const ctx = canvas.getContext('2d');
             framesData.length = 0;
 
-            document.getElementById('nucleusList').innerHTML = '<div class="loading">Analisando frames... 0/' + frames.length + '</div>';
+            document.getElementById('nucleusList').innerHTML = '<div class="loading">Analisando núcleos... 0/' + frames.length + '</div>';
 
             for (let i = 0; i < frames.length; i++) {
                 const img = new Image();
@@ -485,17 +594,16 @@
                             const nuclei = detectNuclei(imageData, img.width, img.height);
                             framesData.push({ frame: i, nuclei, width: img.width, height: img.height });
                         } catch(e) { 
-                            console.error('Canvas error:', e);
                             framesData.push({ frame: i, nuclei: [], width: 1024, height: 1024 });
                         }
-                        document.getElementById('nucleusList').innerHTML = '<div class="loading">Analisando frames... ' + (i+1) + '/' + frames.length + '</div>';
+                        document.getElementById('nucleusList').innerHTML = '<div class="loading">Analisando núcleos... ' + (i+1) + '/' + frames.length + '</div>';
                         resolve();
                     };
                     img.onerror = () => {
                         framesData.push({ frame: i, nuclei: [], width: 1024, height: 1024 });
                         resolve();
                     };
-                    img.src = config.apiFrame + frames[i] + '?t=' + Date.now();
+                    img.src = config.apiFrame + frames[i];
                 });
             }
             
@@ -612,6 +720,9 @@
                 currentFrame = 0;
                 
                 if (frames.length > 0) {
+                    // Criar todos os overlays
+                    await createAllOverlays(radar);
+                    
                     showFrame(0);
                     await analyzeFrames(radar);
                     startPlayback();
@@ -621,44 +732,15 @@
             }
         }
 
-        function showFrame(index) {
-            if (frames.length === 0) return;
-            currentFrame = index;
-            
-            const config = RADAR_CONFIG[currentRadar];
-            const filename = frames[index];
-            
-            if (imageOverlay) map.removeLayer(imageOverlay);
-            imageOverlay = L.imageOverlay(config.apiFrame + filename + '?t=' + Date.now(), config.bounds, { opacity: currentOpacity }).addTo(map);
-            
-            const frameNum = (index + 1) + '/' + frames.length;
-            document.getElementById('frameCounter').textContent = frameNum;
-            document.getElementById('timelineBar').style.width = ((index + 1) / frames.length * 100) + '%';
-            
-            if (currentRadar === 'mendanha') {
-                document.getElementById('currentFrameNum').textContent = frameNum;
-                const match = filename.match(/MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
-                if (match) {
-                    document.getElementById('timeDisplay').textContent = match[3] + '/' + match[2] + '/' + match[1] + ', ' + match[4] + ':' + match[5] + ':00';
-                }
-            } else if (currentRadar === 'sumare') {
-                document.getElementById('sumareFrameNum').textContent = frameNum;
-                const now = new Date();
-                document.getElementById('timeDisplay').textContent = now.toLocaleDateString('pt-BR') + ', ' + now.toLocaleTimeString('pt-BR');
-            }
-            
-            drawArrowsForFrame(index);
-        }
-
         function startPlayback() {
-            if (isPlaying) return;
+            if (isPlaying || !imagesReady) return;
             isPlaying = true;
             document.getElementById('playBtn').textContent = '⏸';
             document.getElementById('playBtn').classList.add('playing');
             playInterval = setInterval(() => {
-                currentFrame = (currentFrame + 1) % frames.length;
-                showFrame(currentFrame);
-            }, 500);
+                const nextFrame = (currentFrame + 1) % frames.length;
+                showFrame(nextFrame);
+            }, ANIMATION_SPEED);
         }
 
         function stopPlayback() {
@@ -676,19 +758,19 @@
 
         document.getElementById('prevBtn').onclick = () => { 
             stopPlayback();
-            currentFrame = (currentFrame - 1 + frames.length) % frames.length; 
-            showFrame(currentFrame); 
+            const prevFrame = (currentFrame - 1 + frames.length) % frames.length;
+            showFrame(prevFrame);
         };
         
         document.getElementById('nextBtn').onclick = () => { 
             stopPlayback();
-            currentFrame = (currentFrame + 1) % frames.length; 
-            showFrame(currentFrame); 
+            const nextFrame = (currentFrame + 1) % frames.length;
+            showFrame(nextFrame);
         };
         
         document.getElementById('timeline').onclick = function(e) { 
-            currentFrame = Math.floor((e.offsetX / this.offsetWidth) * frames.length); 
-            showFrame(currentFrame); 
+            const newFrame = Math.floor((e.offsetX / this.offsetWidth) * frames.length);
+            showFrame(newFrame);
         };
 
         // Iniciar com Mendanha

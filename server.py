@@ -67,7 +67,7 @@ def sync_mendanha():
         files = ftp.nlst()
         radar_files = [f for f in files if re.match(FTP_CONFIG['pattern'], f)]
         radar_files.sort(reverse=True)
-        radar_files = radar_files[:50]  # Pegar mais arquivos para ter histórico
+        radar_files = radar_files[:20]  # Limitar a 20 frames
         
         existing = set(os.listdir(MENDANHA_DIR))
         
@@ -133,6 +133,7 @@ def get_mendanha_frames():
         files = os.listdir(MENDANHA_DIR)
         files = [f for f in files if f.endswith('.png')]
         files.sort(reverse=True)
+        files = files[:20]  # Limitar a 20 frames
         return jsonify({'frames': files, 'count': len(files)})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

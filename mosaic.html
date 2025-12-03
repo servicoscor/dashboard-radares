@@ -42,24 +42,20 @@
             background: #0f1419;
         }
         
-        /* Layout 1: 3 colunas iguais */
         .mosaic-container.layout-1 { grid-template-columns: 1fr 1fr 1fr; }
         
-        /* Layout 2: 1 grande + 2 pequenos embaixo */
         .mosaic-container.layout-2 { 
             grid-template-columns: 1fr 1fr; 
             grid-template-rows: 2fr 1fr; 
         }
         .mosaic-container.layout-2 .panel:first-child { grid-column: 1 / -1; }
         
-        /* Layout 3: 2 em cima + 1 grande embaixo */
         .mosaic-container.layout-3 { 
             grid-template-columns: 1fr 1fr; 
             grid-template-rows: 1fr 2fr; 
         }
         .mosaic-container.layout-3 .panel:nth-child(3) { grid-column: 1 / -1; }
         
-        /* Layout 4: 1 grande esquerda + 2 pequenos direita */
         .mosaic-container.layout-4 { 
             grid-template-columns: 2fr 1fr; 
             grid-template-rows: 1fr 1fr; 
@@ -116,6 +112,29 @@
         .panel-player .time-display { font-size: 11px; color: #fff; min-width: 100px; text-align: center; }
         .panel-player .frame-counter { font-size: 10px; color: #888; }
         
+        .panel-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 20, 25, 0.9);
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 2000;
+            text-align: center;
+            font-size: 12px;
+        }
+        .panel-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #2f3942;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
         .drag-over { outline: 2px dashed #00d4ff; outline-offset: -4px; }
     </style>
 </head>
@@ -158,9 +177,13 @@
             </div>
             <div class="panel-content">
                 <div id="map-mendanha" class="panel-map"></div>
+                <div class="panel-loading" id="loading-mendanha">
+                    <div class="panel-spinner"></div>
+                    <div>Carregando...</div>
+                </div>
                 <div class="panel-player" id="player-mendanha">
                     <button class="ctrl-btn" data-action="prev">⏪</button>
-                    <button class="ctrl-btn" data-action="play">⏸</button>
+                    <button class="ctrl-btn" data-action="play">▶</button>
                     <button class="ctrl-btn" data-action="next">⏩</button>
                     <span class="time-display">Carregando...</span>
                     <span class="frame-counter">0/0</span>
@@ -180,9 +203,13 @@
             </div>
             <div class="panel-content">
                 <div id="map-sumare" class="panel-map"></div>
+                <div class="panel-loading" id="loading-sumare">
+                    <div class="panel-spinner"></div>
+                    <div>Carregando...</div>
+                </div>
                 <div class="panel-player" id="player-sumare">
                     <button class="ctrl-btn" data-action="prev">⏪</button>
-                    <button class="ctrl-btn" data-action="play">⏸</button>
+                    <button class="ctrl-btn" data-action="play">▶</button>
                     <button class="ctrl-btn" data-action="next">⏩</button>
                     <span class="time-display">Carregando...</span>
                     <span class="frame-counter">0/0</span>
@@ -208,7 +235,9 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Configurações dos radares
+        const ANIMATION_SPEED = 650;
+        const BASE_OPACITY = 0.7;
+        
         const RADAR_CONFIG = {
             mendanha: {
                 bounds: [[-24.8, -46.5], [-20.8, -40.5]],
@@ -226,13 +255,76 @@
             }
         };
 
-        // Estado dos radares
         const radarState = {
-            mendanha: { map: null, overlay: null, frames: [], currentFrame: 0, isPlaying: false, interval: null },
-            sumare: { map: null, overlay: null, frames: [], currentFrame: 0, isPlaying: false, interval: null }
+            mendanha: { 
+                map: null, 
+                frames: [], 
+                overlays: [], 
+                currentFrame: 0, 
+                isPlaying: false, 
+                interval: null, 
+                imagesReady: false 
+            },
+            sumare: { 
+                map: null, 
+                frames: [], 
+                overlays: [], 
+                currentFrame: 0, 
+                isPlaying: false, 
+                interval: null, 
+                imagesReady: false 
+            }
         };
 
-        // Inicializar mapas
+        // Criar todos os overlays de uma vez
+        async function createAllOverlays(radar) {
+            const config = RADAR_CONFIG[radar];
+            const state = radarState[radar];
+            
+            // Limpar overlays anteriores
+            state.overlays.forEach(overlay => {
+                if (overlay) state.map.removeLayer(overlay);
+            });
+            state.overlays = [];
+            state.imagesReady = false;
+            
+            const loading = document.getElementById(`loading-${radar}`);
+            loading.style.display = 'block';
+            loading.querySelector('div:last-child').textContent = 'Carregando... 0/' + state.frames.length;
+            
+            let loadedCount = 0;
+            
+            for (let i = 0; i < state.frames.length; i++) {
+                const filename = state.frames[i];
+                const url = config.apiFrame + filename;
+                
+                await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        loadedCount++;
+                        loading.querySelector('div:last-child').textContent = 'Carregando... ' + loadedCount + '/' + state.frames.length;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        loadedCount++;
+                        resolve();
+                    };
+                    img.src = url;
+                });
+                
+                const overlay = L.imageOverlay(url, config.bounds, { opacity: 0 });
+                overlay.addTo(state.map);
+                state.overlays.push(overlay);
+            }
+            
+            if (state.overlays.length > 0) {
+                state.overlays[0].setOpacity(BASE_OPACITY);
+            }
+            
+            state.imagesReady = true;
+            loading.style.display = 'none';
+        }
+
         function initMaps() {
             ['mendanha', 'sumare'].forEach(radar => {
                 const config = RADAR_CONFIG[radar];
@@ -250,7 +342,6 @@
             });
         }
 
-        // Carregar frames
         async function loadFrames(radar) {
             const config = RADAR_CONFIG[radar];
             const state = radarState[radar];
@@ -261,38 +352,41 @@
                 state.frames = data.frames || [];
                 
                 if (state.frames.length > 0) {
+                    await createAllOverlays(radar);
                     showFrame(radar, 0);
                     startPlayback(radar);
                 }
             } catch (e) {
                 console.error(`Erro ao carregar frames ${radar}:`, e);
+                document.getElementById(`loading-${radar}`).style.display = 'none';
             }
         }
 
-        // Mostrar frame
         function showFrame(radar, index) {
             const config = RADAR_CONFIG[radar];
             const state = radarState[radar];
             
-            if (state.frames.length === 0) return;
+            if (state.frames.length === 0 || !state.imagesReady || state.overlays.length === 0) return;
+            
+            // Esconder frame atual
+            if (state.overlays[state.currentFrame]) {
+                state.overlays[state.currentFrame].setOpacity(0);
+            }
             
             state.currentFrame = index;
-            const filename = state.frames[index];
             
-            if (state.overlay) state.map.removeLayer(state.overlay);
-            state.overlay = L.imageOverlay(
-                config.apiFrame + filename + '?t=' + Date.now(), 
-                config.bounds, 
-                { opacity: 0.7 }
-            ).addTo(state.map);
+            // Mostrar novo frame
+            if (state.overlays[state.currentFrame]) {
+                state.overlays[state.currentFrame].setOpacity(BASE_OPACITY);
+            }
             
-            // Atualizar player
             const player = document.getElementById(`player-${radar}`);
             const frameCounter = player.querySelector('.frame-counter');
             const timeDisplay = player.querySelector('.time-display');
             
             frameCounter.textContent = `${index + 1}/${state.frames.length}`;
             
+            const filename = state.frames[index];
             if (radar === 'mendanha') {
                 const match = filename.match(/MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
                 if (match) {
@@ -304,18 +398,17 @@
             }
         }
 
-        // Controles de playback
         function startPlayback(radar) {
             const state = radarState[radar];
-            if (state.isPlaying) return;
+            if (state.isPlaying || !state.imagesReady) return;
             
             state.isPlaying = true;
             updatePlayButton(radar, true);
             
             state.interval = setInterval(() => {
-                state.currentFrame = (state.currentFrame + 1) % state.frames.length;
-                showFrame(radar, state.currentFrame);
-            }, 500);
+                const nextFrame = (state.currentFrame + 1) % state.frames.length;
+                showFrame(radar, nextFrame);
+            }, ANIMATION_SPEED);
         }
 
         function stopPlayback(radar) {
@@ -333,7 +426,6 @@
             playBtn.textContent = isPlaying ? '⏸' : '▶';
         }
 
-        // Event listeners para players
         document.querySelectorAll('.panel-player').forEach(player => {
             const radar = player.id.replace('player-', '');
             
@@ -347,18 +439,17 @@
                         else startPlayback(radar);
                     } else if (action === 'prev') {
                         stopPlayback(radar);
-                        state.currentFrame = (state.currentFrame - 1 + state.frames.length) % state.frames.length;
-                        showFrame(radar, state.currentFrame);
+                        const prevFrame = (state.currentFrame - 1 + state.frames.length) % state.frames.length;
+                        showFrame(radar, prevFrame);
                     } else if (action === 'next') {
                         stopPlayback(radar);
-                        state.currentFrame = (state.currentFrame + 1) % state.frames.length;
-                        showFrame(radar, state.currentFrame);
+                        const nextFrame = (state.currentFrame + 1) % state.frames.length;
+                        showFrame(radar, nextFrame);
                     }
                 };
             });
         });
 
-        // Layout selector
         document.querySelectorAll('.layout-btn').forEach(btn => {
             btn.onclick = function() {
                 document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
@@ -367,7 +458,6 @@
                 const container = document.getElementById('mosaicContainer');
                 container.className = `mosaic-container layout-${this.dataset.layout}`;
                 
-                // Invalidar tamanho dos mapas
                 setTimeout(() => {
                     Object.values(radarState).forEach(state => {
                         if (state.map) state.map.invalidateSize();
@@ -376,7 +466,6 @@
             };
         });
 
-        // Drag and drop para reordenar painéis
         let draggedPanel = null;
 
         document.querySelectorAll('.panel').forEach(panel => {
@@ -417,7 +506,6 @@
                         panel.parentNode.insertBefore(draggedPanel, panel);
                     }
                     
-                    // Invalidar mapas após reordenação
                     setTimeout(() => {
                         Object.values(radarState).forEach(state => {
                             if (state.map) state.map.invalidateSize();
@@ -427,10 +515,8 @@
             });
         });
 
-        // Inicializar
         initMaps();
 
-        // Auto-refresh a cada 2 minutos
         setInterval(() => {
             loadFrames('mendanha');
             loadFrames('sumare');

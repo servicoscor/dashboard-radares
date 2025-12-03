@@ -1,171 +1,486 @@
 # 🌧️ Radar Nowcast - COR Rio
 
-Sistema de visualização de radar meteorológico com detecção de tendência de deslocamento dos núcleos de chuva.
+Sistema de visualização e análise de tendência de chuva em tempo real para o Centro de Operações Rio.
 
-## Funcionalidades
-
-- 📡 **Multi-radar**: Suporte para Sumaré, Mendanha e INEA
-- 🗺️ **Mapa interativo**: Leaflet com limites do município do Rio de Janeiro
-- ➤ **Setas de tendência**: Mostra direção de deslocamento dos núcleos
-- 📊 **Análise em tempo real**: Detecção automática de núcleos e cálculo de velocidade
-- 🔄 **Conexão FTP**: Sincronização automática com servidor de imagens
-
-## Estrutura
-
-```
-radar-nowcast-v2/
-├── index.html      # Frontend (Leaflet + JavaScript)
-├── server.py       # Backend Python (Flask + FTP)
-├── requirements.txt
-├── cache/          # Cache de imagens (criado automaticamente)
-│   ├── sumare/
-│   ├── mendanha/
-│   └── inea/
-└── README.md
-```
-
-## Instalação
-
-### 1. Instalar dependências Python
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Iniciar o servidor backend
-
-```bash
-python server.py
-```
-
-O servidor estará disponível em `http://localhost:5000`
-
-### 3. Abrir o frontend
-
-Abra `index.html` em um navegador ou sirva via servidor web:
-
-```bash
-# Opção 1: Python
-python -m http.server 8080
-
-# Opção 2: Node.js
-npx serve .
-```
-
-Acesse `http://localhost:8080`
-
-## Configuração do FTP
-
-### Dados necessários
-
-| Campo | Descrição | Exemplo |
-|-------|-----------|---------|
-| Servidor | Host do FTP | `ftp.alertario.rio.rj.gov.br` |
-| Usuário | Login | `usuario_cor` |
-| Senha | Password | `********` |
-| Diretório | Caminho das imagens | `/radar/sumare/` |
-
-### Estrutura esperada das imagens
-
-O sistema espera imagens PNG com nomenclatura baseada em timestamp:
-
-```
-radar_sumare_202412031000.png
-radar_sumare_202412031002.png
-radar_sumare_202412031004.png
-...
-```
-
-## API Endpoints
-
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| GET | `/api/radars` | Lista radares disponíveis |
-| GET | `/api/frames/<radar>` | Lista frames em cache |
-| GET | `/api/frame/<radar>/<file>` | Retorna imagem |
-| POST | `/api/ftp/connect` | Conecta ao FTP |
-| GET | `/api/ftp/sync/<radar>` | Sincroniza imagens |
-| GET | `/api/status` | Status do servidor |
-
-### Exemplo de conexão FTP via API
-
-```javascript
-fetch('http://localhost:5000/api/ftp/connect', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        host: 'ftp.alertario.rio.rj.gov.br',
-        user: 'usuario',
-        password: 'senha'
-    })
-});
-```
-
-## Configuração dos Radares
-
-Edite o dicionário `RADARS` em `server.py` para ajustar:
-
-```python
-RADARS = {
-    'sumare': {
-        'name': 'Sumaré',
-        'lat': -22.9519,
-        'lng': -43.1731,
-        'range': 250,  # km
-        'ftp_path': '/radar/sumare/',
-        'file_pattern': 'radar_sumare_%Y%m%d%H%M.png'
-    },
-    # ... outros radares
-}
-```
-
-## Ajuste dos Bounds da Imagem
-
-Para sobrepor corretamente a imagem do radar no mapa, ajuste os bounds no frontend:
-
-```javascript
-const RADARS = {
-    sumare: {
-        // ...
-        bounds: [
-            [-24.5, -45.0],  // Canto SW [lat, lng]
-            [-21.4, -41.3]   // Canto NE [lat, lng]
-        ]
-    }
-};
-```
-
-## Integração com GeoJSON do Município
-
-Para usar os limites oficiais do Rio de Janeiro:
-
-1. Baixe o GeoJSON do IBGE: https://geoftp.ibge.gov.br/
-2. Coloque em `geojson/rio_de_janeiro.geojson`
-3. Atualize a função `loadMunicipalBoundary()` no `index.html`
-
-## Algoritmo de Detecção de Núcleos
-
-1. **Análise de cores**: Identifica pixels com cores do radar (verde → magenta)
-2. **Clusterização**: Agrupa pixels adjacentes (flood fill)
-3. **Centróide**: Calcula centro de massa de cada cluster
-4. **Rastreamento**: Compara posições entre frames consecutivos
-5. **Vetor de movimento**: Calcula direção e velocidade
-6. **Projeção**: Estima posição futura (próximos 30 min)
-
-## Próximos Passos
-
-- [ ] Integrar com API real do Alerta Rio
-- [ ] Adicionar WebSocket para atualizações em tempo real
-- [ ] Implementar alertas por bairro
-- [ ] Histórico de deslocamentos
-- [ ] Machine learning para melhorar previsões
-
-## Suporte
-
-Centro de Operações Rio (COR)
-Desenvolvido para monitoramento meteorológico municipal.
+![Status](https://img.shields.io/badge/status-produção-green)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.11+-yellow)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ---
 
-**Versão**: 2.0.0  
-**Última atualização**: Dezembro 2024
+## 📋 Índice
+
+- [Sobre o Projeto](#-sobre-o-projeto)
+- [Funcionalidades](#-funcionalidades)
+- [Arquitetura](#-arquitetura)
+- [Tecnologias](#-tecnologias)
+- [Requisitos](#-requisitos)
+- [Instalação](#-instalação)
+- [Configuração](#-configuração)
+- [API Reference](#-api-reference)
+- [Segurança](#-segurança)
+- [Estrutura de Arquivos](#-estrutura-de-arquivos)
+- [Troubleshooting](#-troubleshooting)
+- [Roadmap](#-roadmap)
+- [Contribuição](#-contribuição)
+
+---
+
+## 🎯 Sobre o Projeto
+
+O **Radar Nowcast** é uma plataforma web desenvolvida para o Centro de Operações Rio (COR) que integra múltiplas fontes de dados de radar meteorológico, permitindo a visualização em tempo real da movimentação de chuvas na região metropolitana do Rio de Janeiro.
+
+### Objetivos
+
+- Centralizar a visualização de dados de múltiplos radares meteorológicos
+- Fornecer análise automática de núcleos de chuva com direção e velocidade
+- Permitir exportação de animações para relatórios e comunicação
+- Oferecer interface intuitiva para operadores do COR
+
+---
+
+## ✨ Funcionalidades
+
+### Radares Integrados
+
+| Radar | Fonte | Cobertura | Frames |
+|-------|-------|-----------|--------|
+| **Mendanha** | INEA (FTP) | Região Metropolitana RJ | 20 |
+| **Sumaré** | AlertaRio | Cidade do Rio de Janeiro | 20 |
+| **DCNIT** | Defesa Civil Niterói | Niterói e região | Tempo real |
+
+### Recursos Principais
+
+- 🎬 **Animação Suave** - Pré-carregamento de frames para reprodução fluida
+- 🧭 **Setas de Direção** - Análise automática de movimento dos núcleos de chuva
+- 📊 **Detecção de Núcleos** - Identificação e classificação por intensidade (dBZ)
+- 🗺️ **5 Tipos de Mapa** - Escuro, Claro, Ruas, Satélite, Topográfico
+- 📥 **Exportação GIF** - Download de animações para compartilhamento
+- ⛶ **Modo Fullscreen** - Visualização expandida sem sidebar
+- 📱 **Página Mosaico** - 3 radares simultâneos com layouts configuráveis
+- 🔄 **Auto-refresh** - Atualização automática a cada 2 minutos
+- 🧹 **Limpeza Automática** - Remoção de arquivos com mais de 24h
+
+### Layouts do Mosaico
+
+```
+Layout 1: [1][2][3]     Layout 2: [  1  ]     Layout 3: [1][2]     Layout 4: [1][2]
+          3 colunas               [2][3]                [  3  ]              [1][3]
+```
+
+---
+
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENTE (Browser)                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  index.html │  │ mosaic.html │  │   Leaflet   │              │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
+└─────────┼────────────────┼────────────────┼─────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         NGINX (Proxy)                            │
+│                    http://35.225.221.88                          │
+└─────────────────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLASK + GUNICORN (:5000)                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  API REST   │  │ Rate Limit  │  │   Auth      │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+          │                               │
+          ▼                               ▼
+┌──────────────────┐            ┌──────────────────┐
+│   FTP INEA       │            │   AlertaRio API  │
+│   (Mendanha)     │            │   (Sumaré)       │
+│  82.180.153.43   │            │  alertario.rio   │
+└──────────────────┘            └──────────────────┘
+```
+
+### Fluxo de Dados
+
+1. **Sincronização (Background Thread)**
+   - A cada 2 minutos, o backend baixa novos frames
+   - Mendanha: FTP do INEA (20 arquivos mais recentes)
+   - Sumaré: HTTP do AlertaRio (20 frames fixos)
+
+2. **Requisição do Cliente**
+   - Frontend solicita lista de frames disponíveis
+   - Pré-carrega todas as imagens antes de animar
+   - Alterna opacidade dos overlays (sem recarregar)
+
+3. **Análise de Núcleos**
+   - Canvas analisa pixels de cada frame
+   - Detecta clusters de cores (intensidade dBZ)
+   - Calcula movimento entre frames consecutivos
+   - Desenha setas indicando direção e velocidade
+
+---
+
+## 🛠️ Tecnologias
+
+### Backend
+- **Python 3.11+** - Linguagem principal
+- **Flask** - Framework web
+- **Gunicorn** - WSGI HTTP Server (produção)
+- **Flask-CORS** - Cross-Origin Resource Sharing
+- **Pillow** - Processamento de imagens (GIF)
+- **Requests** - Cliente HTTP
+
+### Frontend
+- **HTML5 / CSS3 / JavaScript** - Base
+- **Leaflet.js** - Mapas interativos
+- **Canvas API** - Análise de imagens
+
+### Infraestrutura
+- **Google Cloud Platform** - VM Compute Engine
+- **Ubuntu 24.04** - Sistema Operacional
+- **Nginx** - Reverse Proxy
+- **Supervisor** - Gerenciador de processos
+- **Git/GitHub** - Versionamento
+
+---
+
+## 📦 Requisitos
+
+### Sistema
+- Ubuntu 20.04+ ou Debian 11+
+- Python 3.11+
+- Nginx
+- Supervisor
+- 1GB RAM mínimo
+- 10GB disco
+
+### Acesso
+- Credenciais FTP INEA (Mendanha)
+- Acesso à internet (AlertaRio)
+
+---
+
+## 🚀 Instalação
+
+### 1. Clonar Repositório
+
+```bash
+cd /var/www
+sudo git clone https://github.com/mcoutinho2512/radar-nowcast.git
+cd radar-nowcast
+```
+
+### 2. Criar Ambiente Virtual
+
+```bash
+sudo python3 -m venv venv
+sudo venv/bin/pip install --upgrade pip
+sudo venv/bin/pip install flask flask-cors requests pillow gunicorn
+```
+
+### 3. Criar Diretórios
+
+```bash
+sudo mkdir -p cache/mendanha cache/sumare cache/exports
+sudo mkdir -p /var/log/radar-nowcast
+sudo chown -R www-data:www-data /var/www/radar-nowcast
+sudo chown -R www-data:www-data /var/log/radar-nowcast
+```
+
+### 4. Configurar Supervisor
+
+```bash
+sudo nano /etc/supervisor/conf.d/radar-nowcast.conf
+```
+
+```ini
+[program:radar-nowcast]
+directory=/var/www/radar-nowcast
+command=/var/www/radar-nowcast/venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 server:app
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stderr_logfile=/var/log/radar-nowcast/error.log
+stdout_logfile=/var/log/radar-nowcast/access.log
+environment=
+    FTP_HOST="82.180.153.43",
+    FTP_USER="seu_usuario",
+    FTP_PASSWORD="sua_senha",
+    ADMIN_TOKEN="seu_token_seguro"
+```
+
+```bash
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start radar-nowcast
+```
+
+### 5. Configurar Nginx
+
+```bash
+sudo nano /etc/nginx/sites-available/radar-nowcast
+```
+
+```nginx
+server {
+    listen 80;
+    server_name seu-dominio.com.br;
+
+    root /var/www/radar-nowcast;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/radar-nowcast /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+
+## ⚙️ Configuração
+
+### Variáveis de Ambiente
+
+| Variável | Descrição | Obrigatório |
+|----------|-----------|-------------|
+| `FTP_HOST` | IP do servidor FTP INEA | Sim |
+| `FTP_USER` | Usuário FTP | Sim |
+| `FTP_PASSWORD` | Senha FTP | Sim |
+| `ADMIN_TOKEN` | Token para endpoints admin | Sim |
+
+### Gerar Token Seguro
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+---
+
+## 📡 API Reference
+
+### Endpoints Públicos
+
+#### Listar Frames
+
+```http
+GET /api/frames/mendanha
+GET /api/frames/sumare
+```
+
+**Resposta:**
+```json
+{
+  "frames": ["MDN-20251203-1200.png", "MDN-20251203-1150.png"],
+  "count": 20
+}
+```
+
+#### Obter Frame
+
+```http
+GET /api/frame/mendanha/{filename}
+GET /api/frame/sumare/{filename}
+```
+
+**Resposta:** Imagem PNG
+
+#### Exportar GIF
+
+```http
+GET /api/export/gif/{radar}
+```
+
+**Parâmetros:** `radar` = `mendanha` ou `sumare`
+
+**Resposta:** Arquivo GIF animado
+
+**Rate Limit:** 5 requisições/minuto
+
+#### Status
+
+```http
+GET /api/status
+```
+
+**Resposta:**
+```json
+{
+  "mendanha": {"files_count": 20, "last_sync": "2025-12-03T22:32:56"},
+  "sumare": {"files_count": 20, "last_sync": "2025-12-03T22:33:01"},
+  "status": "ok"
+}
+```
+
+### Endpoints Administrativos
+
+Requerem header `X-Admin-Token` ou query param `?token=`
+
+#### Sync Manual
+
+```http
+GET /api/sync/mendanha?token=SEU_TOKEN
+GET /api/sync/sumare?token=SEU_TOKEN
+```
+
+#### Status Detalhado
+
+```http
+GET /api/admin/status?token=SEU_TOKEN
+```
+
+---
+
+## 🔒 Segurança
+
+### Medidas Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Path Traversal** | Validação e sanitização de nomes de arquivo |
+| **Rate Limiting** | Limite de requisições por IP (100/min geral, 5/min GIF) |
+| **CORS Restrito** | Apenas domínios autorizados |
+| **Token Admin** | Endpoints sensíveis protegidos |
+| **Credenciais** | Via variáveis de ambiente (não no código) |
+| **Gunicorn** | Servidor de produção (sem debug) |
+
+### Recomendações
+
+1. **Alterar token padrão** antes de publicar
+2. **Configurar HTTPS** com Let's Encrypt
+3. **Firewall** - Liberar apenas portas 80/443
+4. **Trocar senha FTP** periodicamente
+5. **Monitorar logs** em `/var/log/radar-nowcast/`
+
+---
+
+## 📁 Estrutura de Arquivos
+
+```
+/var/www/radar-nowcast/
+├── index.html          # Página principal
+├── mosaic.html         # Página mosaico (3 radares)
+├── server.py           # Backend Flask
+├── logo-cor.png        # Logo COR Rio
+├── venv/               # Ambiente virtual Python
+├── cache/
+│   ├── mendanha/       # Frames do radar Mendanha
+│   ├── sumare/         # Frames do radar Sumaré
+│   └── exports/        # GIFs temporários
+└── README.md           # Documentação
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Backend não inicia
+
+```bash
+# Verificar logs
+sudo tail -f /var/log/radar-nowcast/error.log
+
+# Verificar status
+sudo supervisorctl status radar-nowcast
+
+# Reiniciar
+sudo supervisorctl restart radar-nowcast
+```
+
+### Frames não carregam
+
+```bash
+# Verificar se há arquivos
+ls -la /var/www/radar-nowcast/cache/mendanha/
+
+# Forçar sync manual
+curl "http://localhost:5000/api/sync/mendanha?token=SEU_TOKEN"
+```
+
+### Erro de permissão
+
+```bash
+sudo chown -R www-data:www-data /var/www/radar-nowcast
+```
+
+### FTP não conecta
+
+```bash
+# Testar conexão manualmente
+ftp 82.180.153.43
+```
+
+### Nginx 502 Bad Gateway
+
+```bash
+# Verificar se Flask está rodando
+sudo supervisorctl status radar-nowcast
+
+# Verificar porta
+curl http://localhost:5000/api/status
+```
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Radar Mendanha (INEA)
+- [x] Radar Sumaré (AlertaRio)
+- [x] DCNIT Niterói (iframe)
+- [x] Detecção de núcleos com setas
+- [x] Exportação GIF
+- [x] Modo fullscreen
+- [x] Página mosaico
+- [x] Correções de segurança
+- [ ] SSL/HTTPS (Let's Encrypt)
+- [ ] Histórico de eventos
+- [ ] Alertas automáticos
+- [ ] Integração com Telegram/WhatsApp
+- [ ] Dashboard de métricas
+
+---
+
+## 👥 Contribuição
+
+1. Fork o projeto
+2. Crie sua branch (`git checkout -b feature/nova-funcionalidade`)
+3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Este projeto é de uso interno do Centro de Operações Rio (COR).
+
+---
+
+## 📞 Contato
+
+**Centro de Operações Rio**
+- Website: [cor.rio](https://cor.rio)
+- GitHub: [@mcoutinho2512](https://github.com/mcoutinho2512)
+
+---
+
+<p align="center">
+  Desenvolvido com ☁️ para o <strong>Centro de Operações Rio</strong>
+</p>

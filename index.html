@@ -12,10 +12,8 @@
         .container.fullscreen { grid-template-columns: 1fr 0; }
         .container.fullscreen .sidebar { display: none; }
         header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: #1a1f26; border-bottom: 1px solid #2f3942; }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #00ff88); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo h1 { font-size: 1.25rem; background: linear-gradient(90deg, #00d4ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .logo span { font-size: 0.7rem; color: #8899a6; }
+        .logo { display: flex; align-items: center; }
+        .logo img { height: 40px; }
         .header-controls { display: flex; align-items: center; gap: 12px; }
         .radar-selector { display: flex; gap: 4px; background: #0f1419; padding: 4px; border-radius: 10px; }
         .radar-btn { padding: 8px 14px; border: none; background: transparent; color: #8899a6; font-size: 0.85rem; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
@@ -84,8 +82,7 @@
     <div class="container" id="container">
         <header>
             <div class="logo">
-                <div class="logo-icon">🌧️</div>
-                <div><h1>Radar Nowcast</h1><span>Sistema de Tendência de Chuva • COR Rio</span></div>
+                <img src="logo-cor.png" alt="Centro de Operações Rio">
             </div>
             <div class="header-controls">
                 <div class="radar-selector">

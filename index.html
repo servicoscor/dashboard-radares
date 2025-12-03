@@ -14,17 +14,101 @@
         .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, #00d4ff, #00ff88); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .logo h1 { font-size: 1.25rem; background: linear-gradient(90deg, #00d4ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .logo span { font-size: 0.7rem; color: #8899a6; }
+        .header-controls { display: flex; align-items: center; gap: 12px; }
+        .radar-selector { display: flex; gap: 4px; background: #0f1419; padding: 4px; border-radius: 10px; }
+        .radar-btn { padding: 8px 14px; border: none; background: transparent; color: #8899a6; font-size: 0.85rem; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .radar-btn:hover { color: #fff; background: #242b33; }
+        .radar-btn.active { background: #00d4ff; color: #000; }
         .status { display: flex; align-items: center; gap: 8px; background: #0f1419; padding: 8px 14px; border-radius: 20px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #00ff88; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .map-area { position: relative; }
         #map { width: 100%; height: 100%; }
-        .controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: rgba(26, 31, 38, 0.95); border-radius: 16px; border: 1px solid #2f3942; z-index: 1000; }
-        .btn { width: 40px; height: 40px; border: none; background: #0f1419; color: #fff; border-radius: 10px; cursor: pointer; font-size: 16px; }
-        .btn:hover { background: #00d4ff; color: #000; }
-        .btn.active { background: #00ff88; color: #000; }
-        .timeline { width: 200px; height: 6px; background: #0f1419; border-radius: 3px; cursor: pointer; }
-        .timeline-bar { height: 100%; background: linear-gradient(90deg, #00d4ff, #00ff88); border-radius: 3px; width: 0%; }
-        .time { font-family: monospace; color: #00d4ff; min-width: 140px; text-align: center; }
+        #externalRadar { width: 100%; height: 100%; border: none; display: none; }
+        
+        /* Player estilo DCNIT */
+        .controls { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            padding: 8px 16px; 
+            background: rgba(50, 55, 65, 0.95); 
+            border-radius: 8px; 
+            z-index: 1000; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .ctrl-btn { 
+            width: 32px; 
+            height: 32px; 
+            border: none; 
+            background: transparent; 
+            color: #fff; 
+            cursor: pointer; 
+            font-size: 14px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
+        .ctrl-btn.playing { color: #00d4ff; }
+        .time-display { 
+            font-size: 14px; 
+            color: #fff; 
+            font-weight: 500;
+            min-width: 150px;
+            text-align: center;
+        }
+        .timeline-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .timeline { 
+            width: 180px; 
+            height: 4px; 
+            background: #555; 
+            border-radius: 2px; 
+            cursor: pointer; 
+            position: relative;
+        }
+        .timeline-bar { 
+            height: 100%; 
+            background: #00d4ff; 
+            border-radius: 2px; 
+            width: 0%; 
+            position: relative;
+        }
+        .timeline-handle {
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .fps-display {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #aaa;
+            font-size: 13px;
+        }
+        .fps-icon { font-size: 16px; }
+        .frame-counter {
+            color: #888;
+            font-size: 12px;
+            margin-left: 4px;
+        }
+        
         .sidebar { background: #1a1f26; padding: 16px; overflow-y: auto; border-left: 1px solid #2f3942; }
         .card { background: #0f1419; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
         .card-title { font-size: 0.75rem; color: #8899a6; text-transform: uppercase; margin-bottom: 12px; border-left: 3px solid #00d4ff; padding-left: 8px; }
@@ -54,6 +138,9 @@
         .map-btn:hover { border-color: #00d4ff; color: #fff; }
         .map-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
         .loading { color: #00d4ff; font-size: 0.8rem; }
+        .external-info { color: #8899a6; font-size: 0.85rem; line-height: 1.5; }
+        .external-link { color: #00d4ff; text-decoration: none; }
+        .external-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -63,26 +150,53 @@
                 <div class="logo-icon">🌧️</div>
                 <div><h1>Radar Nowcast</h1><span>Sistema de Tendência de Chuva • COR Rio</span></div>
             </div>
-            <div class="status"><div class="status-dot"></div><span id="statusText">Conectado</span></div>
+            <div class="header-controls">
+                <div class="radar-selector">
+                    <button class="radar-btn active" data-radar="mendanha">Mendanha</button>
+                    <button class="radar-btn" data-radar="dcnit">DCNIT Niterói</button>
+                </div>
+                <div class="status"><div class="status-dot"></div><span id="statusText">Conectado</span></div>
+            </div>
         </header>
-        <div style="position: relative;">
+        <div class="map-area">
             <div id="map"></div>
-            <div class="controls">
-                <button class="btn" id="prevBtn">⏮</button>
-                <button class="btn" id="playBtn">▶</button>
-                <button class="btn" id="nextBtn">⏭</button>
-                <div class="timeline" id="timeline"><div class="timeline-bar" id="timelineBar"></div></div>
-                <div class="time" id="timeDisplay">Carregando...</div>
+            <iframe id="externalRadar" src=""></iframe>
+            <div class="controls" id="controls">
+                <button class="ctrl-btn" id="prevBtn">⏪</button>
+                <button class="ctrl-btn" id="playBtn">⏸</button>
+                <button class="ctrl-btn" id="nextBtn">⏩</button>
+                <div class="time-display" id="timeDisplay">03/12/2025, 00:00:00</div>
+                <div class="timeline-container">
+                    <div class="timeline" id="timeline">
+                        <div class="timeline-bar" id="timelineBar">
+                            <div class="timeline-handle"></div>
+                        </div>
+                    </div>
+                    <span class="frame-counter" id="frameCounter">0/0</span>
+                </div>
+                <div class="fps-display">
+                    <span class="fps-icon">⏱</span>
+                    <span>2fps</span>
+                </div>
             </div>
         </div>
         <div class="sidebar">
-            <div class="card">
-                <div class="card-title">Radar Mendanha</div>
-                <div class="info-row"><span class="info-label">Frames</span><span class="info-value" id="frameCount">0</span></div>
-                <div class="info-row"><span class="info-label">Atual</span><span class="info-value" id="currentFrameNum">0</span></div>
-                <div class="info-row"><span class="info-label">Núcleos</span><span class="info-value" id="nucleiCount">0</span></div>
+            <div class="card" id="radarInfoCard">
+                <div class="card-title" id="radarTitle">Radar Mendanha</div>
+                <div id="mendanhaInfo">
+                    <div class="info-row"><span class="info-label">Frames</span><span class="info-value" id="frameCount">0</span></div>
+                    <div class="info-row"><span class="info-label">Atual</span><span class="info-value" id="currentFrameNum">0</span></div>
+                    <div class="info-row"><span class="info-label">Núcleos</span><span class="info-value" id="nucleiCount">0</span></div>
+                </div>
+                <div id="dcnitInfo" style="display:none;">
+                    <p class="external-info">
+                        Sistema de Vigilância da Defesa Civil de Niterói.<br><br>
+                        Exibe estações pluviométricas e pontos de alerta em tempo real.<br><br>
+                        <a href="https://svidaniteroi.com.br/radar/" target="_blank" class="external-link">Abrir em nova aba ↗</a>
+                    </p>
+                </div>
             </div>
-            <div class="card">
+            <div class="card" id="mapCard">
                 <div class="card-title">Tipo de Mapa</div>
                 <div class="map-selector">
                     <button class="map-btn active" data-map="dark">Escuro</button>
@@ -92,13 +206,13 @@
                     <button class="map-btn" data-map="topo">Topográfico</button>
                 </div>
             </div>
-            <div class="card">
+            <div class="card" id="configCard">
                 <div class="card-title">Configurações</div>
                 <div class="toggle-row"><span class="toggle-label">Marcador radar</span><div class="toggle" id="toggleMarker"></div></div>
                 <div class="toggle-row"><span class="toggle-label">Setas de direção</span><div class="toggle active" id="toggleArrows"></div></div>
                 <div class="toggle-row"><span class="toggle-label">Opacidade alta</span><div class="toggle" id="toggleOpacity"></div></div>
             </div>
-            <div class="card">
+            <div class="card" id="nucleiCard">
                 <div class="card-title">Núcleos Detectados</div>
                 <div class="nucleus-list" id="nucleusList"><div class="loading">Analisando frames...</div></div>
             </div>
@@ -133,7 +247,8 @@
         let map, imageOverlay, radarMarker, arrowsLayer, currentTileLayer;
         let frames = [], currentFrame = 0, isPlaying = false, playInterval;
         let currentOpacity = 0.7, showArrows = true;
-        let allFramesData = []; // Armazena dados de núcleos de todos os frames
+        let allFramesData = [];
+        let currentRadar = 'mendanha';
 
         function createArrowIcon(angle) {
             const svg = `<svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
@@ -158,6 +273,46 @@
         
         radarMarker = L.marker([-22.8167, -43.5500]).bindPopup('Radar Mendanha');
         arrowsLayer = L.layerGroup().addTo(map);
+
+        // Seletor de radar
+        document.querySelectorAll('.radar-btn').forEach(btn => {
+            btn.onclick = function() {
+                document.querySelectorAll('.radar-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentRadar = this.dataset.radar;
+                
+                if (currentRadar === 'dcnit') {
+                    document.getElementById('map').style.display = 'none';
+                    document.getElementById('externalRadar').style.display = 'block';
+                    document.getElementById('externalRadar').src = 'https://svidaniteroi.com.br/radar/';
+                    document.getElementById('controls').style.display = 'none';
+                    
+                    document.getElementById('radarTitle').textContent = 'DCNIT Niterói';
+                    document.getElementById('mendanhaInfo').style.display = 'none';
+                    document.getElementById('dcnitInfo').style.display = 'block';
+                    document.getElementById('mapCard').style.display = 'none';
+                    document.getElementById('configCard').style.display = 'none';
+                    document.getElementById('nucleiCard').style.display = 'none';
+                    
+                    stopPlayback();
+                } else {
+                    document.getElementById('map').style.display = 'block';
+                    document.getElementById('externalRadar').style.display = 'none';
+                    document.getElementById('externalRadar').src = '';
+                    document.getElementById('controls').style.display = 'flex';
+                    
+                    document.getElementById('radarTitle').textContent = 'Radar Mendanha';
+                    document.getElementById('mendanhaInfo').style.display = 'block';
+                    document.getElementById('dcnitInfo').style.display = 'none';
+                    document.getElementById('mapCard').style.display = 'block';
+                    document.getElementById('configCard').style.display = 'block';
+                    document.getElementById('nucleiCard').style.display = 'block';
+                    
+                    map.invalidateSize();
+                    startPlayback();
+                }
+            };
+        });
 
         document.querySelectorAll('.map-btn').forEach(btn => {
             btn.onclick = function() {
@@ -252,7 +407,6 @@
             return directions[idx];
         }
 
-        // Analisar TODOS os frames
         async function analyzeAllFrames() {
             if (frames.length < 2) return;
             
@@ -289,12 +443,10 @@
                 });
             }
             
-            // Calcular movimentos entre frames consecutivos
             calculateMovements();
             drawArrowsForFrame(currentFrame);
         }
 
-        // Calcular movimento de cada núcleo entre frames
         function calculateMovements() {
             for (let i = 0; i < allFramesData.length - 1; i++) {
                 const current = allFramesData[i];
@@ -333,7 +485,6 @@
             }
         }
 
-        // Desenhar setas para um frame específico
         function drawArrowsForFrame(frameIndex) {
             arrowsLayer.clearLayers();
             if (!showArrows || allFramesData.length === 0) return;
@@ -383,13 +534,16 @@
                 const data = await res.json();
                 const newFrames = data.frames || [];
                 
-                // Só re-analisa se os frames mudaram
                 if (JSON.stringify(newFrames) !== JSON.stringify(frames)) {
                     frames = newFrames;
                     document.getElementById('frameCount').textContent = frames.length;
                     if (frames.length > 0) {
                         showFrame(0);
                         analyzeAllFrames();
+                        // Auto play ao carregar
+                        if (!isPlaying && currentRadar === 'mendanha') {
+                            startPlayback();
+                        }
                     }
                 }
             } catch (e) { console.error('Erro:', e); }
@@ -401,32 +555,65 @@
             const filename = frames[index];
             if (imageOverlay) map.removeLayer(imageOverlay);
             imageOverlay = L.imageOverlay('/api/frame/mendanha/' + filename, RADAR_BOUNDS, { opacity: currentOpacity }).addTo(map);
-            document.getElementById('currentFrameNum').textContent = (index + 1) + '/' + frames.length;
-            document.getElementById('timelineBar').style.width = ((index + 1) / frames.length * 100) + '%';
-            const match = filename.match(/MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
-            if (match) document.getElementById('timeDisplay').textContent = match[3] + '/' + match[2] + '/' + match[1] + ' ' + match[4] + ':' + match[5];
             
-            // Atualizar setas para este frame
+            // Atualizar contador de frames
+            document.getElementById('currentFrameNum').textContent = (index + 1) + '/' + frames.length;
+            document.getElementById('frameCounter').textContent = (index + 1) + '/' + frames.length;
+            document.getElementById('timelineBar').style.width = ((index + 1) / frames.length * 100) + '%';
+            
+            // Atualizar display de tempo no formato DD/MM/YYYY, HH:MM:SS
+            const match = filename.match(/MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
+            if (match) {
+                const timeStr = match[3] + '/' + match[2] + '/' + match[1] + ', ' + match[4] + ':' + match[5] + ':00';
+                document.getElementById('timeDisplay').textContent = timeStr;
+            }
+            
             drawArrowsForFrame(index);
         }
 
+        function startPlayback() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('playBtn').textContent = '⏸';
+            document.getElementById('playBtn').classList.add('playing');
+            playInterval = setInterval(() => {
+                currentFrame = (currentFrame + 1) % frames.length;
+                showFrame(currentFrame);
+            }, 500); // 2fps
+        }
+
+        function stopPlayback() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            document.getElementById('playBtn').textContent = '▶';
+            document.getElementById('playBtn').classList.remove('playing');
+            clearInterval(playInterval);
+        }
+
         document.getElementById('playBtn').onclick = function() {
-            isPlaying = !isPlaying;
-            this.textContent = isPlaying ? '⏸' : '▶';
-            this.classList.toggle('active', isPlaying);
             if (isPlaying) {
-                playInterval = setInterval(() => {
-                    currentFrame = (currentFrame + 1) % frames.length;
-                    showFrame(currentFrame);
-                }, 500);
+                stopPlayback();
             } else {
-                clearInterval(playInterval);
+                startPlayback();
             }
         };
 
-        document.getElementById('prevBtn').onclick = () => { currentFrame = (currentFrame - 1 + frames.length) % frames.length; showFrame(currentFrame); };
-        document.getElementById('nextBtn').onclick = () => { currentFrame = (currentFrame + 1) % frames.length; showFrame(currentFrame); };
-        document.getElementById('timeline').onclick = function(e) { currentFrame = Math.floor((e.offsetX / this.offsetWidth) * frames.length); showFrame(currentFrame); };
+        document.getElementById('prevBtn').onclick = () => { 
+            stopPlayback();
+            currentFrame = (currentFrame - 1 + frames.length) % frames.length; 
+            showFrame(currentFrame); 
+        };
+        
+        document.getElementById('nextBtn').onclick = () => { 
+            stopPlayback();
+            currentFrame = (currentFrame + 1) % frames.length; 
+            showFrame(currentFrame); 
+        };
+        
+        document.getElementById('timeline').onclick = function(e) { 
+            currentFrame = Math.floor((e.offsetX / this.offsetWidth) * frames.length); 
+            showFrame(currentFrame); 
+        };
 
         loadFrames();
         setInterval(loadFrames, 120000);

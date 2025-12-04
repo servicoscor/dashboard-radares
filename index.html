@@ -2,21 +2,41 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Radar Nowcast - COR Rio</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #0f1419; color: #fff; height: 100vh; overflow: hidden; }
-        .container { display: grid; grid-template-columns: 1fr 300px; grid-template-rows: 60px 1fr; height: 100vh; transition: grid-template-columns 0.3s ease; }
+        
+        /* Container principal */
+        .container { 
+            display: grid; 
+            grid-template-columns: 1fr 300px; 
+            grid-template-rows: 60px 1fr; 
+            height: 100vh; 
+            transition: grid-template-columns 0.3s ease; 
+        }
         .container.fullscreen { grid-template-columns: 1fr 0; }
         .container.fullscreen .sidebar { display: none; }
-        header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: #1a1f26; border-bottom: 1px solid #2f3942; }
+        
+        /* Header */
+        header { 
+            grid-column: 1 / -1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 20px; 
+            background: #1a1f26; 
+            border-bottom: 1px solid #2f3942; 
+        }
         .logo { display: flex; align-items: center; }
         .logo img { height: 40px; }
         .header-controls { display: flex; align-items: center; gap: 12px; }
         .radar-selector { display: flex; gap: 4px; background: #0f1419; padding: 4px; border-radius: 10px; }
-        .radar-btn { padding: 8px 14px; border: none; background: transparent; color: #8899a6; font-size: 0.85rem; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .radar-btn { padding: 8px 14px; border: none; background: transparent; color: #8899a6; font-size: 0.85rem; font-weight: 500; border-radius: 8px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .radar-btn:hover { color: #fff; background: #242b33; }
         .radar-btn.active { background: #00d4ff; color: #000; }
         .header-btn { padding: 8px 12px; border: 1px solid #2f3942; background: transparent; color: #8899a6; font-size: 0.85rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
@@ -25,11 +45,54 @@
         .status { display: flex; align-items: center; gap: 8px; background: #0f1419; padding: 8px 14px; border-radius: 20px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #00ff88; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        /* Botão toggle sidebar mobile */
+        .sidebar-toggle {
+            display: none;
+            padding: 8px 12px;
+            border: 1px solid #2f3942;
+            background: transparent;
+            color: #8899a6;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .sidebar-toggle.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
+        
+        /* Map area */
         .map-area { position: relative; }
         #map { width: 100%; height: 100%; }
         #externalRadar { width: 100%; height: 100%; border: none; display: none; }
-        .controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(50, 55, 65, 0.95); border-radius: 8px; z-index: 1000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .ctrl-btn { width: 32px; height: 32px; border: none; background: transparent; color: #fff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.2s; }
+        
+        /* Controls player */
+        .controls { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            padding: 8px 16px; 
+            background: rgba(50, 55, 65, 0.95); 
+            border-radius: 8px; 
+            z-index: 1000; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        }
+        .ctrl-btn { 
+            width: 32px; 
+            height: 32px; 
+            border: none; 
+            background: transparent; 
+            color: #fff; 
+            cursor: pointer; 
+            font-size: 14px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border-radius: 4px; 
+            transition: background 0.2s; 
+        }
         .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
         .ctrl-btn.playing { color: #00d4ff; }
         .time-display { font-size: 14px; color: #fff; font-weight: 500; min-width: 150px; text-align: center; }
@@ -40,7 +103,15 @@
         .fps-display { display: flex; align-items: center; gap: 4px; color: #aaa; font-size: 13px; }
         .fps-icon { font-size: 16px; }
         .frame-counter { color: #888; font-size: 12px; margin-left: 4px; }
-        .sidebar { background: #1a1f26; padding: 16px; overflow-y: auto; border-left: 1px solid #2f3942; transition: all 0.3s ease; }
+        
+        /* Sidebar */
+        .sidebar { 
+            background: #1a1f26; 
+            padding: 16px; 
+            overflow-y: auto; 
+            border-left: 1px solid #2f3942; 
+            transition: all 0.3s ease; 
+        }
         .card { background: #0f1419; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
         .card-title { font-size: 0.75rem; color: #8899a6; text-transform: uppercase; margin-bottom: 12px; border-left: 3px solid #00d4ff; padding-left: 8px; }
         .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2f3942; }
@@ -79,6 +150,232 @@
         .loading-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(15, 20, 25, 0.9); padding: 20px 30px; border-radius: 10px; z-index: 2000; text-align: center; }
         .loading-spinner { width: 40px; height: 40px; border: 3px solid #2f3942; border-top-color: #00d4ff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ============================================ */
+        /* MOBILE BOTTOM BAR - Radar e Mapa selector */
+        /* ============================================ */
+        .mobile-bottom-bar {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1f26;
+            border-top: 1px solid #2f3942;
+            padding: 8px;
+            z-index: 1002;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .mobile-radar-selector {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+        }
+        .mobile-radar-selector .radar-btn {
+            flex: 1;
+            text-align: center;
+            padding: 10px 8px;
+            font-size: 0.8rem;
+        }
+        .mobile-map-selector {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        .mobile-map-selector .map-btn {
+            padding: 6px 12px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+
+        /* ============================================ */
+        /* RESPONSIVO - TABLET (768px - 1024px) */
+        /* ============================================ */
+        @media (max-width: 1024px) {
+            .container { grid-template-columns: 1fr 260px; }
+            .radar-btn { padding: 6px 10px; font-size: 0.8rem; }
+            .header-btn span:last-child { display: none; }
+            .status span { display: none; }
+            .timeline { width: 120px; }
+            .time-display { min-width: 130px; font-size: 13px; }
+        }
+
+        /* ============================================ */
+        /* RESPONSIVO - TABLET PEQUENO (600px - 768px) */
+        /* ============================================ */
+        @media (max-width: 768px) {
+            .container { 
+                grid-template-columns: 1fr; 
+                grid-template-rows: 56px 1fr; 
+            }
+            
+            header { padding: 0 12px; }
+            .logo img { height: 32px; }
+            
+            .header-controls { gap: 8px; }
+            
+            /* Esconder seletores do header no mobile */
+            .radar-selector { display: none; }
+            
+            .header-btn { padding: 6px 10px; }
+            .header-btn span:last-child { display: none; }
+            
+            .status { padding: 6px 10px; }
+            .status span { display: none; }
+            
+            .sidebar-toggle { display: flex; }
+            
+            /* Sidebar como bottom sheet */
+            .sidebar {
+                position: fixed;
+                bottom: 90px;
+                left: 0;
+                right: 0;
+                max-height: 45vh;
+                border-left: none;
+                border-top: 1px solid #2f3942;
+                border-radius: 20px 20px 0 0;
+                transform: translateY(100%);
+                transition: transform 0.3s ease;
+                z-index: 1001;
+                padding-top: 24px;
+            }
+            .sidebar::before {
+                content: '';
+                position: absolute;
+                top: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 4px;
+                background: #2f3942;
+                border-radius: 2px;
+            }
+            .sidebar.open { transform: translateY(0); }
+            
+            .container.fullscreen .sidebar { display: block; }
+            
+            /* Mostrar barra inferior mobile */
+            .mobile-bottom-bar { display: flex; }
+            
+            /* Controls adaptados */
+            .controls {
+                bottom: 100px;
+                padding: 6px 12px;
+                gap: 6px;
+                width: calc(100% - 20px);
+                max-width: 500px;
+            }
+            .timeline { width: 80px; }
+            .time-display { min-width: 110px; font-size: 12px; }
+            .fps-display { display: none; }
+            
+            .card { padding: 12px; margin-bottom: 12px; }
+            
+            /* Esconder card de mapa na sidebar (já está na barra inferior) */
+            #mapCard { display: none; }
+        }
+
+        /* ============================================ */
+        /* RESPONSIVO - MOBILE (até 480px) */
+        /* ============================================ */
+        @media (max-width: 480px) {
+            .container { grid-template-rows: 50px 1fr; }
+            
+            header { padding: 0 8px; }
+            .logo img { height: 28px; }
+            
+            .header-controls { gap: 6px; }
+            
+            #fullscreenBtn { display: none; }
+            
+            .sidebar-toggle { 
+                display: flex; 
+                padding: 6px 10px;
+                font-size: 1rem;
+            }
+            
+            .sidebar {
+                max-height: 50vh;
+                padding: 20px 12px 12px;
+                bottom: 100px;
+            }
+            
+            .controls {
+                bottom: 110px;
+                padding: 8px 10px;
+                gap: 4px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .ctrl-btn { width: 36px; height: 36px; font-size: 16px; }
+            .timeline-container { 
+                order: 1; 
+                width: 100%; 
+                justify-content: center;
+                margin-top: 4px;
+            }
+            .timeline { width: 150px; height: 6px; }
+            .timeline-handle { width: 16px; height: 16px; }
+            .time-display { 
+                font-size: 13px; 
+                min-width: auto;
+                order: 0;
+            }
+            .frame-counter { display: none; }
+            
+            .card-title { font-size: 0.7rem; }
+            .info-label, .info-value { font-size: 0.8rem; }
+            .legend { grid-template-columns: 1fr; }
+            .nucleus-list { max-height: 100px; }
+            
+            .mobile-bottom-bar { padding: 6px 8px; gap: 6px; }
+            .mobile-radar-selector .radar-btn { padding: 8px 6px; font-size: 0.75rem; }
+            .mobile-map-selector .map-btn { padding: 5px 10px; font-size: 0.65rem; }
+        }
+
+        /* ============================================ */
+        /* RESPONSIVO - MOBILE PEQUENO (até 360px) */
+        /* ============================================ */
+        @media (max-width: 360px) {
+            .logo img { height: 24px; }
+            .sidebar-toggle { padding: 5px 8px; }
+            
+            .controls { padding: 6px 8px; }
+            .ctrl-btn { width: 32px; height: 32px; }
+            .time-display { font-size: 12px; }
+            .timeline { width: 120px; }
+            
+            .mobile-radar-selector .radar-btn { padding: 6px 4px; font-size: 0.7rem; }
+        }
+
+        /* ============================================ */
+        /* LANDSCAPE MOBILE */
+        /* ============================================ */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .container { grid-template-rows: 45px 1fr; }
+            header { padding: 0 10px; }
+            .logo img { height: 28px; }
+            
+            .sidebar { max-height: 60vh; bottom: 70px; }
+            
+            .mobile-bottom-bar { 
+                flex-direction: row; 
+                padding: 4px 8px;
+                gap: 10px;
+            }
+            .mobile-radar-selector { flex: 1; }
+            .mobile-map-selector { flex: 1; }
+            
+            .controls {
+                bottom: 75px;
+                padding: 4px 10px;
+            }
+            .ctrl-btn { width: 28px; height: 28px; font-size: 12px; }
+        }
     </style>
 </head>
 <body>
@@ -91,14 +388,15 @@
                 <div class="radar-selector">
                     <button class="radar-btn active" data-radar="mendanha">Mendanha</button>
                     <button class="radar-btn" data-radar="sumare">Sumaré</button>
-                    <button class="radar-btn" data-radar="dcnit">DCNIT Niterói</button>
+                    <button class="radar-btn" data-radar="dcnit">DCNIT</button>
                 </div>
                 <button class="header-btn" id="mosaicBtn" onclick="window.location.href='mosaic.html'">
-                    <span>⊞</span> Mosaico
+                    <span>⊞</span> <span>Mosaico</span>
                 </button>
                 <button class="header-btn" id="fullscreenBtn">
                     <span id="fullscreenIcon">⛶</span> <span id="fullscreenText">Expandir</span>
                 </button>
+                <button class="sidebar-toggle" id="sidebarToggle">☰</button>
                 <div class="status"><div class="status-dot"></div><span id="statusText">Conectado</span></div>
             </div>
         </header>
@@ -146,7 +444,6 @@
                 <div id="dcnitInfo" style="display:none;">
                     <p class="external-info">
                         Sistema de Vigilância da Defesa Civil de Niterói.<br><br>
-                        Exibe estações pluviométricas e pontos de alerta em tempo real.<br><br>
                         <a href="https://svidaniteroi.com.br/radar/" target="_blank" class="external-link">Abrir em nova aba ↗</a>
                     </p>
                 </div>
@@ -156,11 +453,8 @@
                 <div class="card-title">Exportar Animação</div>
                 <button class="download-btn" id="downloadGif">
                     <span class="icon">📥</span>
-                    <span>Baixar GIF Animado</span>
+                    <span>Baixar GIF</span>
                 </button>
-                <p style="color: #8899a6; font-size: 0.75rem; margin-top: 10px; text-align: center;">
-                    Gera animação com todos os frames disponíveis
-                </p>
             </div>
             
             <div class="card" id="mapCard">
@@ -170,7 +464,7 @@
                     <button class="map-btn" data-map="light">Claro</button>
                     <button class="map-btn" data-map="streets">Ruas</button>
                     <button class="map-btn" data-map="satellite">Satélite</button>
-                    <button class="map-btn" data-map="topo">Topográfico</button>
+                    <button class="map-btn" data-map="topo">Topo</button>
                 </div>
             </div>
             <div class="card" id="configCard">
@@ -196,11 +490,28 @@
             </div>
         </div>
     </div>
+    
+    <!-- Barra inferior mobile -->
+    <div class="mobile-bottom-bar" id="mobileBottomBar">
+        <div class="mobile-radar-selector">
+            <button class="radar-btn active" data-radar="mendanha">Mendanha</button>
+            <button class="radar-btn" data-radar="sumare">Sumaré</button>
+            <button class="radar-btn" data-radar="dcnit">DCNIT</button>
+        </div>
+        <div class="mobile-map-selector">
+            <button class="map-btn active" data-map="dark">Escuro</button>
+            <button class="map-btn" data-map="light">Claro</button>
+            <button class="map-btn" data-map="streets">Ruas</button>
+            <button class="map-btn" data-map="satellite">Satélite</button>
+            <button class="map-btn" data-map="topo">Topo</button>
+        </div>
+    </div>
+    
     <canvas id="analysisCanvas" style="display:none;"></canvas>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Configurações
-        const ANIMATION_SPEED = 650; // ms entre frames
+        const ANIMATION_SPEED = 650;
         const BASE_OPACITY = 0.7;
         const HIGH_OPACITY = 0.9;
         
@@ -239,10 +550,23 @@
         let currentOpacity = BASE_OPACITY, showArrows = true;
         let allFramesData = { mendanha: [], sumare: [] };
         let currentRadar = 'mendanha';
-        
-        // Array de overlays pré-carregados (um para cada frame)
         let frameOverlays = [];
         let imagesReady = false;
+
+        // Sidebar toggle mobile
+        document.getElementById('sidebarToggle').onclick = function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+            this.classList.toggle('active');
+        };
+
+        // Fechar sidebar ao clicar fora (mobile)
+        document.getElementById('map').addEventListener('click', function() {
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('sidebarToggle').classList.remove('active');
+            }
+        });
 
         // Fullscreen toggle
         let isFullscreen = false;
@@ -272,36 +596,43 @@
             });
         }
 
-        map = L.map('map').setView(RADAR_CONFIG.mendanha.center, RADAR_CONFIG.mendanha.zoom);
+        // Ajustar zoom inicial baseado no tamanho da tela
+        function getInitialZoom() {
+            if (window.innerWidth <= 480) return 7;
+            if (window.innerWidth <= 768) return 7;
+            return 8;
+        }
+
+        map = L.map('map', { zoomControl: window.innerWidth > 768 }).setView(RADAR_CONFIG.mendanha.center, getInitialZoom());
         currentTileLayer = MAP_LAYERS.dark;
         currentTileLayer.addTo(map);
+        
+        // Adicionar controle de zoom em posição diferente no mobile
+        if (window.innerWidth <= 768) {
+            L.control.zoom({ position: 'topright' }).addTo(map);
+        }
         
         radarMarker = L.marker(RADAR_CONFIG.mendanha.markerPos).bindPopup(RADAR_CONFIG.mendanha.markerName);
         arrowsLayer = L.layerGroup().addTo(map);
 
-        // Criar todos os overlays de uma vez
         async function createAllOverlays(radar) {
             const config = RADAR_CONFIG[radar];
             
-            // Limpar overlays anteriores
             frameOverlays.forEach(overlay => {
                 if (overlay) map.removeLayer(overlay);
             });
             frameOverlays = [];
             imagesReady = false;
             
-            // Mostrar loading
             document.getElementById('loadingOverlay').style.display = 'block';
             document.getElementById('loadingText').textContent = 'Carregando imagens... 0/' + frames.length;
             
             let loadedCount = 0;
             
-            // Criar um overlay para cada frame
             for (let i = 0; i < frames.length; i++) {
                 const filename = frames[i];
                 const url = config.apiFrame + filename;
                 
-                // Pré-carregar a imagem
                 await new Promise((resolve) => {
                     const img = new Image();
                     img.onload = () => {
@@ -316,39 +647,32 @@
                     img.src = url;
                 });
                 
-                // Criar overlay com opacidade 0 (invisível)
                 const overlay = L.imageOverlay(url, config.bounds, { opacity: 0 });
                 overlay.addTo(map);
                 frameOverlays.push(overlay);
             }
             
-            // Mostrar primeiro frame
             if (frameOverlays.length > 0) {
                 frameOverlays[0].setOpacity(currentOpacity);
             }
             
             imagesReady = true;
             document.getElementById('loadingOverlay').style.display = 'none';
-            console.log(`${radar}: ${frameOverlays.length} overlays criados`);
         }
 
-        // Mostrar frame (apenas alterna opacidade)
         function showFrame(index) {
             if (frames.length === 0 || !imagesReady || frameOverlays.length === 0) return;
             
-            // Esconder frame atual
             if (frameOverlays[currentFrame]) {
                 frameOverlays[currentFrame].setOpacity(0);
             }
             
             currentFrame = index;
             
-            // Mostrar novo frame
             if (frameOverlays[currentFrame]) {
                 frameOverlays[currentFrame].setOpacity(currentOpacity);
             }
             
-            // Atualizar UI
             const frameNum = (index + 1) + '/' + frames.length;
             document.getElementById('frameCounter').textContent = frameNum;
             document.getElementById('timelineBar').style.width = ((index + 1) / frames.length * 100) + '%';
@@ -376,7 +700,7 @@
             const originalText = btn.innerHTML;
             
             btn.disabled = true;
-            btn.innerHTML = '<span class="icon">⏳</span><span>Gerando GIF...</span>';
+            btn.innerHTML = '<span class="icon">⏳</span><span>Gerando...</span>';
             
             try {
                 const response = await fetch(`/api/export/gif/${currentRadar}`);
@@ -396,7 +720,7 @@
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(url);
                 
-                btn.innerHTML = '<span class="icon">✅</span><span>Download Concluído!</span>';
+                btn.innerHTML = '<span class="icon">✅</span><span>Concluído!</span>';
                 setTimeout(() => {
                     btn.innerHTML = originalText;
                     btn.disabled = false;
@@ -408,71 +732,100 @@
             }
         };
 
-        // Seletor de radar
+        // Função para trocar radar (usada por ambos seletores)
+        function switchRadar(radar) {
+            // Atualizar todos os botões de radar
+            document.querySelectorAll('.radar-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.radar === radar);
+            });
+            
+            currentRadar = radar;
+            
+            stopPlayback();
+            arrowsLayer.clearLayers();
+            
+            // Fechar sidebar no mobile após selecionar
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('open');
+                document.getElementById('sidebarToggle').classList.remove('active');
+            }
+            
+            if (currentRadar === 'dcnit') {
+                document.getElementById('map').style.display = 'none';
+                document.getElementById('externalRadar').style.display = 'block';
+                document.getElementById('externalRadar').src = 'https://svidaniteroi.com.br/radar/';
+                document.getElementById('controls').style.display = 'none';
+                
+                document.getElementById('radarTitle').textContent = 'DCNIT Niterói';
+                document.getElementById('mendanhaInfo').style.display = 'none';
+                document.getElementById('sumareInfo').style.display = 'none';
+                document.getElementById('dcnitInfo').style.display = 'block';
+                document.getElementById('mapCard').style.display = 'none';
+                document.getElementById('configCard').style.display = 'none';
+                document.getElementById('nucleiCard').style.display = 'none';
+                document.getElementById('exportCard').style.display = 'none';
+                
+                // Esconder seletor de mapa no mobile quando DCNIT
+                document.querySelector('.mobile-map-selector').style.display = 'none';
+            } else {
+                document.getElementById('map').style.display = 'block';
+                document.getElementById('externalRadar').style.display = 'none';
+                document.getElementById('externalRadar').src = '';
+                document.getElementById('controls').style.display = 'flex';
+                document.getElementById('mapCard').style.display = 'block';
+                document.getElementById('configCard').style.display = 'block';
+                document.getElementById('nucleiCard').style.display = 'block';
+                document.getElementById('exportCard').style.display = 'block';
+                
+                // Mostrar seletor de mapa no mobile
+                document.querySelector('.mobile-map-selector').style.display = 'flex';
+                
+                const config = RADAR_CONFIG[currentRadar];
+                map.setView(config.center, getInitialZoom());
+                
+                radarMarker.setLatLng(config.markerPos);
+                radarMarker.setPopupContent(config.markerName);
+                
+                if (currentRadar === 'mendanha') {
+                    document.getElementById('radarTitle').textContent = 'Radar Mendanha';
+                    document.getElementById('mendanhaInfo').style.display = 'block';
+                    document.getElementById('sumareInfo').style.display = 'none';
+                    document.getElementById('dcnitInfo').style.display = 'none';
+                } else if (currentRadar === 'sumare') {
+                    document.getElementById('radarTitle').textContent = 'Radar Sumaré';
+                    document.getElementById('mendanhaInfo').style.display = 'none';
+                    document.getElementById('sumareInfo').style.display = 'block';
+                    document.getElementById('dcnitInfo').style.display = 'none';
+                }
+                
+                loadFrames(currentRadar);
+                map.invalidateSize();
+            }
+        }
+
+        // Função para trocar mapa (usada por ambos seletores)
+        function switchMap(mapType) {
+            // Atualizar todos os botões de mapa
+            document.querySelectorAll('.map-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.map === mapType);
+            });
+            
+            map.removeLayer(currentTileLayer);
+            currentTileLayer = MAP_LAYERS[mapType];
+            currentTileLayer.addTo(map);
+        }
+
+        // Seletor de radar (header e mobile)
         document.querySelectorAll('.radar-btn').forEach(btn => {
             btn.onclick = function() {
-                document.querySelectorAll('.radar-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentRadar = this.dataset.radar;
-                
-                stopPlayback();
-                arrowsLayer.clearLayers();
-                
-                if (currentRadar === 'dcnit') {
-                    document.getElementById('map').style.display = 'none';
-                    document.getElementById('externalRadar').style.display = 'block';
-                    document.getElementById('externalRadar').src = 'https://svidaniteroi.com.br/radar/';
-                    document.getElementById('controls').style.display = 'none';
-                    
-                    document.getElementById('radarTitle').textContent = 'DCNIT Niterói';
-                    document.getElementById('mendanhaInfo').style.display = 'none';
-                    document.getElementById('sumareInfo').style.display = 'none';
-                    document.getElementById('dcnitInfo').style.display = 'block';
-                    document.getElementById('mapCard').style.display = 'none';
-                    document.getElementById('configCard').style.display = 'none';
-                    document.getElementById('nucleiCard').style.display = 'none';
-                    document.getElementById('exportCard').style.display = 'none';
-                } else {
-                    document.getElementById('map').style.display = 'block';
-                    document.getElementById('externalRadar').style.display = 'none';
-                    document.getElementById('externalRadar').src = '';
-                    document.getElementById('controls').style.display = 'flex';
-                    document.getElementById('mapCard').style.display = 'block';
-                    document.getElementById('configCard').style.display = 'block';
-                    document.getElementById('nucleiCard').style.display = 'block';
-                    document.getElementById('exportCard').style.display = 'block';
-                    
-                    const config = RADAR_CONFIG[currentRadar];
-                    map.setView(config.center, config.zoom);
-                    
-                    radarMarker.setLatLng(config.markerPos);
-                    radarMarker.setPopupContent(config.markerName);
-                    
-                    if (currentRadar === 'mendanha') {
-                        document.getElementById('radarTitle').textContent = 'Radar Mendanha';
-                        document.getElementById('mendanhaInfo').style.display = 'block';
-                        document.getElementById('sumareInfo').style.display = 'none';
-                        document.getElementById('dcnitInfo').style.display = 'none';
-                    } else if (currentRadar === 'sumare') {
-                        document.getElementById('radarTitle').textContent = 'Radar Sumaré';
-                        document.getElementById('mendanhaInfo').style.display = 'none';
-                        document.getElementById('sumareInfo').style.display = 'block';
-                        document.getElementById('dcnitInfo').style.display = 'none';
-                    }
-                    
-                    loadFrames(currentRadar);
-                    map.invalidateSize();
-                }
+                switchRadar(this.dataset.radar);
             };
         });
 
+        // Seletor de mapa (sidebar e mobile)
         document.querySelectorAll('.map-btn').forEach(btn => {
             btn.onclick = function() {
-                document.querySelectorAll('.map-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                map.removeLayer(currentTileLayer);
-                currentTileLayer = MAP_LAYERS[this.dataset.map];
-                currentTileLayer.addTo(map);
+                switchMap(this.dataset.map);
             };
         });
 
@@ -494,7 +847,6 @@
         document.getElementById('toggleOpacity').onclick = function() {
             this.classList.toggle('active');
             currentOpacity = this.classList.contains('active') ? HIGH_OPACITY : BASE_OPACITY;
-            // Atualizar opacidade do frame atual
             if (frameOverlays[currentFrame]) {
                 frameOverlays[currentFrame].setOpacity(currentOpacity);
             }
@@ -720,9 +1072,7 @@
                 currentFrame = 0;
                 
                 if (frames.length > 0) {
-                    // Criar todos os overlays
                     await createAllOverlays(radar);
-                    
                     showFrame(0);
                     await analyzeFrames(radar);
                     startPlayback();
@@ -772,6 +1122,21 @@
             const newFrame = Math.floor((e.offsetX / this.offsetWidth) * frames.length);
             showFrame(newFrame);
         };
+
+        // Suporte a touch na timeline
+        document.getElementById('timeline').addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const newFrame = Math.floor((x / rect.width) * frames.length);
+            showFrame(Math.max(0, Math.min(newFrame, frames.length - 1)));
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            setTimeout(() => map.invalidateSize(), 100);
+        });
 
         // Iniciar com Mendanha
         loadFrames('mendanha');

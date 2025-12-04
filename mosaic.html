@@ -114,6 +114,22 @@
         .panel-map { width: 100%; height: 100%; }
         .panel-iframe { width: 100%; height: 100%; border: none; }
         
+        /* Iframe recortado para Niterói */
+        .niteroi-iframe-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .niteroi-iframe-container iframe {
+            position: absolute;
+            top: -119px;
+            left: -5px;
+            width: calc(100% + 10px);
+            height: calc(100% + 217px);
+            border: none;
+        }
+        
         .panel-player {
             position: absolute;
             bottom: 8px;
@@ -297,7 +313,7 @@
     <div class="mobile-tabs" id="mobileTabs">
         <button class="mobile-tab active" data-panel="mendanha">Mendanha</button>
         <button class="mobile-tab" data-panel="sumare">Sumaré</button>
-        <button class="mobile-tab" data-panel="dcnit">DCNIT</button>
+        <button class="mobile-tab" data-panel="niteroi">Niterói</button>
     </div>
     
     <div class="mosaic-container layout-1" id="mosaicContainer">
@@ -347,15 +363,17 @@
             </div>
         </div>
         
-        <div class="panel" data-radar="dcnit">
+        <div class="panel" data-radar="niteroi">
             <div class="panel-header">
                 <div class="panel-title">
-                    <span class="panel-badge" style="background: #00ff88;">DCNIT</span>
-                    <span style="font-size: 0.7rem; color: #8899a6;">Niterói</span>
+                    <span class="panel-badge" style="background: #00ff88;">Niterói</span>
+                    <span style="font-size: 0.7rem; color: #8899a6;">Defesa Civil</span>
                 </div>
             </div>
             <div class="panel-content">
-                <iframe class="panel-iframe" id="iframe-dcnit" src="https://svidaniteroi.com.br/radar/"></iframe>
+                <div class="niteroi-iframe-container">
+                    <iframe class="panel-iframe" id="iframe-niteroi" src="https://radar.niteroi.rj.gov.br/"></iframe>
+                </div>
             </div>
         </div>
     </div>

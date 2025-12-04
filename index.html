@@ -64,6 +64,23 @@
         #map { width: 100%; height: 100%; }
         #externalRadar { width: 100%; height: 100%; border: none; display: none; }
         
+        /* Iframe recortado para Niterói */
+        .iframe-cropped-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: none;
+        }
+        .iframe-cropped-container iframe {
+            position: absolute;
+            top: -119px;
+            left: -5px;
+            width: calc(100% + 10px);
+            height: calc(100% + 98px);
+            border: none;
+        }
+        
         /* Controls player */
         .controls { 
             position: absolute; 
@@ -388,7 +405,7 @@
                 <div class="radar-selector">
                     <button class="radar-btn active" data-radar="mendanha">Mendanha</button>
                     <button class="radar-btn" data-radar="sumare">Sumaré</button>
-                    <button class="radar-btn" data-radar="dcnit">DCNIT</button>
+                    <button class="radar-btn" data-radar="niteroi">Niterói</button>
                 </div>
                 <button class="header-btn" id="mosaicBtn" onclick="window.location.href='mosaic.html'">
                     <span>⊞</span> <span>Mosaico</span>
@@ -407,6 +424,9 @@
                 <div id="loadingText">Carregando imagens...</div>
             </div>
             <iframe id="externalRadar" src=""></iframe>
+            <div class="iframe-cropped-container" id="niteroiContainer">
+                <iframe id="niteroiRadar" src=""></iframe>
+            </div>
             <div class="controls" id="controls">
                 <button class="ctrl-btn" id="prevBtn">⏪</button>
                 <button class="ctrl-btn" id="playBtn">▶</button>
@@ -441,10 +461,11 @@
                     <div class="info-row"><span class="info-label">Atual</span><span class="info-value" id="sumareFrameNum">0</span></div>
                     <div class="info-row"><span class="info-label">Núcleos</span><span class="info-value" id="sumareNucleiCount">0</span></div>
                 </div>
-                <div id="dcnitInfo" style="display:none;">
+                <div id="niteroiInfo" style="display:none;">
                     <p class="external-info">
-                        Sistema de Vigilância da Defesa Civil de Niterói.<br><br>
-                        <a href="https://svidaniteroi.com.br/radar/" target="_blank" class="external-link">Abrir em nova aba ↗</a>
+                        Radar Banda X - Defesa Civil de Niterói.<br>
+                        Alcance: 100km | Parque da Cidade<br><br>
+                        <a href="https://radar.niteroi.rj.gov.br/" target="_blank" class="external-link">Abrir em nova aba ↗</a>
                     </p>
                 </div>
             </div>
@@ -496,7 +517,7 @@
         <div class="mobile-radar-selector">
             <button class="radar-btn active" data-radar="mendanha">Mendanha</button>
             <button class="radar-btn" data-radar="sumare">Sumaré</button>
-            <button class="radar-btn" data-radar="dcnit">DCNIT</button>
+            <button class="radar-btn" data-radar="niteroi">Niterói</button>
         </div>
         <div class="mobile-map-selector">
             <button class="map-btn active" data-map="dark">Escuro</button>
@@ -750,27 +771,29 @@
                 document.getElementById('sidebarToggle').classList.remove('active');
             }
             
-            if (currentRadar === 'dcnit') {
+            if (currentRadar === 'niteroi') {
                 document.getElementById('map').style.display = 'none';
-                document.getElementById('externalRadar').style.display = 'block';
-                document.getElementById('externalRadar').src = 'https://svidaniteroi.com.br/radar/';
+                document.getElementById('externalRadar').style.display = 'none';
+                document.getElementById('niteroiContainer').style.display = 'block';
+                document.getElementById('niteroiRadar').src = 'https://radar.niteroi.rj.gov.br/';
                 document.getElementById('controls').style.display = 'none';
                 
-                document.getElementById('radarTitle').textContent = 'DCNIT Niterói';
+                document.getElementById('radarTitle').textContent = 'Radar Niterói';
                 document.getElementById('mendanhaInfo').style.display = 'none';
                 document.getElementById('sumareInfo').style.display = 'none';
-                document.getElementById('dcnitInfo').style.display = 'block';
+                document.getElementById('niteroiInfo').style.display = 'block';
                 document.getElementById('mapCard').style.display = 'none';
                 document.getElementById('configCard').style.display = 'none';
                 document.getElementById('nucleiCard').style.display = 'none';
                 document.getElementById('exportCard').style.display = 'none';
                 
-                // Esconder seletor de mapa no mobile quando DCNIT
+                // Esconder seletor de mapa no mobile quando Niterói
                 document.querySelector('.mobile-map-selector').style.display = 'none';
             } else {
                 document.getElementById('map').style.display = 'block';
                 document.getElementById('externalRadar').style.display = 'none';
-                document.getElementById('externalRadar').src = '';
+                document.getElementById('niteroiContainer').style.display = 'none';
+                document.getElementById('niteroiRadar').src = '';
                 document.getElementById('controls').style.display = 'flex';
                 document.getElementById('mapCard').style.display = 'block';
                 document.getElementById('configCard').style.display = 'block';
@@ -790,12 +813,12 @@
                     document.getElementById('radarTitle').textContent = 'Radar Mendanha';
                     document.getElementById('mendanhaInfo').style.display = 'block';
                     document.getElementById('sumareInfo').style.display = 'none';
-                    document.getElementById('dcnitInfo').style.display = 'none';
+                    document.getElementById('niteroiInfo').style.display = 'none';
                 } else if (currentRadar === 'sumare') {
                     document.getElementById('radarTitle').textContent = 'Radar Sumaré';
                     document.getElementById('mendanhaInfo').style.display = 'none';
                     document.getElementById('sumareInfo').style.display = 'block';
-                    document.getElementById('dcnitInfo').style.display = 'none';
+                    document.getElementById('niteroiInfo').style.display = 'none';
                 }
                 
                 loadFrames(currentRadar);

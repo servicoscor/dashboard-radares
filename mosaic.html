@@ -8,8 +8,81 @@
     <title>Mosaico - Radar Nowcast</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* Variáveis de Tema */
+        :root {
+            --bg-primary: #0f1419;
+            --bg-secondary: #1a1f26;
+            --bg-tertiary: #242b33;
+            --border-color: #2f3942;
+            --text-primary: #ffffff;
+            --text-secondary: #8899a6;
+            --accent-color: #00d4ff;
+            --success-color: #00ff88;
+            --controls-bg: rgba(50, 55, 65, 0.95);
+        }
+        
+        /* Modo Claro - Paleta Oficial Prefeitura Rio */
+        body.light-mode {
+            --bg-primary: #eceded;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #e0e0e0;
+            --border-color: #c5c5c5;
+            --text-primary: #13335a;
+            --text-secondary: #4a6a8a;
+            --accent-color: #13335a;
+            --success-color: #00aa55;
+            --controls-bg: rgba(255, 255, 255, 0.95);
+        }
+        
+        /* Correções específicas para modo claro */
+        body.light-mode .header-btn {
+            color: #13335a;
+            border-color: #c5c5c5;
+        }
+        body.light-mode .header-btn:hover {
+            background: #e0e0e0;
+            border-color: #13335a;
+        }
+        body.light-mode .layout-btn {
+            background: #ffffff;
+            border-color: #c5c5c5;
+        }
+        body.light-mode .layout-btn svg rect,
+        body.light-mode .layout-btn svg path {
+            fill: #13335a;
+        }
+        body.light-mode .layout-btn.active {
+            background: #13335a;
+        }
+        body.light-mode .layout-btn.active svg rect,
+        body.light-mode .layout-btn.active svg path {
+            fill: #ffffff;
+        }
+        body.light-mode .mobile-tab {
+            color: #13335a;
+            background: #ffffff;
+        }
+        body.light-mode .mobile-tab.active {
+            background: #13335a;
+            color: #ffffff;
+        }
+        body.light-mode .theme-toggle {
+            color: #13335a;
+            border-color: #c5c5c5;
+        }
+        body.light-mode .panel-player .ctrl-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #0f1419; color: #fff; height: 100vh; overflow: hidden; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg-primary); 
+            color: var(--text-primary); 
+            height: 100vh; 
+            overflow: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
         
         header { 
             height: 50px; 
@@ -17,39 +90,53 @@
             align-items: center; 
             justify-content: space-between; 
             padding: 0 20px; 
-            background: #1a1f26; 
-            border-bottom: 1px solid #2f3942; 
+            background: var(--bg-secondary); 
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
         .logo { display: flex; align-items: center; }
         .logo img { height: 32px; }
         
         .header-controls { display: flex; align-items: center; gap: 10px; }
-        .header-btn { padding: 6px 12px; border: 1px solid #2f3942; background: transparent; color: #8899a6; font-size: 0.8rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
-        .header-btn:hover { border-color: #00d4ff; color: #fff; }
-        .header-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
+        .header-btn { padding: 6px 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); font-size: 0.8rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .header-btn:hover { border-color: var(--accent-color); color: var(--text-primary); }
+        .header-btn.active { background: var(--accent-color); color: #000; border-color: var(--accent-color); }
         
-        .layout-selector { display: flex; gap: 4px; background: #0f1419; padding: 4px; border-radius: 8px; }
-        .layout-btn { width: 36px; height: 28px; border: 1px solid #2f3942; background: #1a1f26; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .layout-btn:hover { border-color: #00d4ff; }
-        .layout-btn.active { background: #00d4ff; border-color: #00d4ff; }
+        .theme-toggle {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .theme-toggle:hover { border-color: var(--accent-color); color: var(--text-primary); }
+        
+        .layout-selector { display: flex; gap: 4px; background: var(--bg-primary); padding: 4px; border-radius: 8px; transition: background 0.3s ease; }
+        .layout-btn { width: 36px; height: 28px; border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .layout-btn:hover { border-color: var(--accent-color); }
+        .layout-btn.active { background: var(--accent-color); border-color: var(--accent-color); }
         .layout-btn svg { width: 20px; height: 16px; }
         .layout-btn.active svg rect, .layout-btn.active svg path { fill: #000; }
-        .layout-btn svg rect, .layout-btn svg path { fill: #8899a6; }
+        .layout-btn svg rect, .layout-btn svg path { fill: var(--text-secondary); }
         
         /* Tabs para mobile */
         .mobile-tabs {
             display: none;
-            background: #1a1f26;
+            background: var(--bg-secondary);
             padding: 8px;
             gap: 4px;
-            border-bottom: 1px solid #2f3942;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
         .mobile-tab {
             flex: 1;
             padding: 12px 8px;
             border: none;
-            background: #0f1419;
-            color: #8899a6;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
             font-size: 0.9rem;
             font-weight: 500;
             border-radius: 8px;
@@ -57,7 +144,7 @@
             transition: all 0.2s;
         }
         .mobile-tab.active {
-            background: #00d4ff;
+            background: var(--accent-color);
             color: #000;
         }
         
@@ -66,7 +153,8 @@
             display: grid; 
             gap: 4px; 
             padding: 4px; 
-            background: #0f1419;
+            background: var(--bg-primary);
+            transition: background 0.3s ease;
         }
         
         .mosaic-container.layout-1 { grid-template-columns: 1fr 1fr 1fr; }
@@ -90,25 +178,28 @@
         .mosaic-container.layout-4 .panel:first-child { grid-row: 1 / -1; }
         
         .panel { 
-            background: #1a1f26; 
+            background: var(--bg-secondary); 
             border-radius: 8px; 
             overflow: hidden; 
             position: relative;
             display: flex;
             flex-direction: column;
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
         
         .panel-header { 
             height: 36px; 
-            background: #242b33; 
+            background: var(--bg-tertiary); 
             display: flex; 
             align-items: center; 
             justify-content: space-between;
             padding: 0 12px;
-            border-bottom: 1px solid #2f3942;
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
         .panel-title { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-        .panel-badge { padding: 2px 8px; background: #00d4ff; color: #000; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .panel-badge { padding: 2px 8px; background: var(--accent-color); color: #000; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
         
         .panel-content { flex: 1; position: relative; }
         .panel-map { width: 100%; height: 100%; }
@@ -139,35 +230,38 @@
             align-items: center;
             gap: 6px;
             padding: 6px 12px;
-            background: rgba(50, 55, 65, 0.95);
+            background: var(--controls-bg);
             border-radius: 6px;
             z-index: 1000;
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
         }
         .panel-player .ctrl-btn { 
             width: 28px; height: 28px; border: none; background: transparent; 
-            color: #fff; cursor: pointer; font-size: 12px; border-radius: 4px; 
+            color: var(--text-primary); cursor: pointer; font-size: 12px; border-radius: 4px; 
         }
         .panel-player .ctrl-btn:hover { background: rgba(255,255,255,0.1); }
-        .panel-player .time-display { font-size: 12px; color: #fff; min-width: 90px; text-align: center; }
-        .panel-player .frame-counter { font-size: 10px; color: #888; }
+        .panel-player .time-display { font-size: 12px; color: var(--text-primary); min-width: 90px; text-align: center; }
+        .panel-player .frame-counter { font-size: 10px; color: var(--text-secondary); }
         
         .panel-loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(15, 20, 25, 0.9);
+            background: var(--controls-bg);
             padding: 15px 20px;
             border-radius: 8px;
             z-index: 2000;
             text-align: center;
             font-size: 12px;
+            border: 1px solid var(--border-color);
         }
         .panel-spinner {
             width: 24px;
             height: 24px;
-            border: 2px solid #2f3942;
-            border-top-color: #00d4ff;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 8px;
@@ -303,6 +397,9 @@
                     <svg viewBox="0 0 24 18"><rect x="1" y="1" width="14" height="16" rx="1"/><rect x="17" y="1" width="6" height="7" rx="1"/><rect x="17" y="10" width="6" height="7" rx="1"/></svg>
                 </button>
             </div>
+            <button class="theme-toggle" id="themeToggle" title="Alternar tema">
+                <span id="themeIcon">☀️</span>
+            </button>
             <button class="header-btn" onclick="window.location.href='index.html'">
                 <span>←</span> <span>Voltar</span>
             </button>
@@ -321,7 +418,7 @@
             <div class="panel-header">
                 <div class="panel-title">
                     <span class="panel-badge">Mendanha</span>
-                    <span style="font-size: 0.7rem; color: #8899a6;">INEA</span>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary);">INEA</span>
                 </div>
             </div>
             <div class="panel-content">
@@ -344,7 +441,7 @@
             <div class="panel-header">
                 <div class="panel-title">
                     <span class="panel-badge" style="background: #ff9900;">Sumaré</span>
-                    <span style="font-size: 0.7rem; color: #8899a6;">AlertaRio</span>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary);">AlertaRio</span>
                 </div>
             </div>
             <div class="panel-content">
@@ -367,7 +464,7 @@
             <div class="panel-header">
                 <div class="panel-title">
                     <span class="panel-badge" style="background: #00ff88;">Niterói</span>
-                    <span style="font-size: 0.7rem; color: #8899a6;">Defesa Civil</span>
+                    <span style="font-size: 0.7rem; color: var(--text-secondary);">Defesa Civil</span>
                 </div>
             </div>
             <div class="panel-content">
@@ -382,6 +479,34 @@
     <script>
         const ANIMATION_SPEED = 650;
         const BASE_OPACITY = 0.7;
+        
+        // Theme toggle (modo escuro/claro)
+        let isDarkMode = localStorage.getItem('theme') !== 'light';
+        
+        function applyTheme() {
+            document.body.classList.toggle('light-mode', !isDarkMode);
+            document.getElementById('themeIcon').textContent = isDarkMode ? '☀️' : '🌙';
+            
+            // Trocar logo baseado no tema
+            const logo = document.querySelector('.logo img');
+            if (logo) {
+                logo.src = isDarkMode ? 'logo-cor.png' : 'logo-cor-azul.png';
+            }
+            
+            // Trocar mapas do mosaico
+            if (typeof switchMosaicMaps === 'function' && radarState.mendanha.map) {
+                switchMosaicMaps(!isDarkMode);
+            }
+        }
+        
+        document.getElementById('themeToggle').onclick = function() {
+            isDarkMode = !isDarkMode;
+            localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+            applyTheme();
+        };
+        
+        // Aplicar tema salvo ao carregar
+        applyTheme();
         
         const RADAR_CONFIG = {
             mendanha: {
@@ -503,6 +628,9 @@
         }
 
         function initMaps() {
+            const darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const streetsTile = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            
             ['mendanha', 'sumare'].forEach(radar => {
                 const config = RADAR_CONFIG[radar];
                 const state = radarState[radar];
@@ -513,9 +641,26 @@
                     zoomControl: true
                 });
                 
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(state.map);
+                // Escolher tile baseado no tema atual
+                const tileUrl = isDarkMode ? darkTile : streetsTile;
+                state.tileLayer = L.tileLayer(tileUrl).addTo(state.map);
                 
                 loadFrames(radar);
+            });
+        }
+        
+        // Função para trocar tile layer dos mapas do mosaico
+        function switchMosaicMaps(toStreets) {
+            const darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+            const streetsTile = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            const tileUrl = toStreets ? streetsTile : darkTile;
+            
+            ['mendanha', 'sumare'].forEach(radar => {
+                const state = radarState[radar];
+                if (state.map && state.tileLayer) {
+                    state.map.removeLayer(state.tileLayer);
+                    state.tileLayer = L.tileLayer(tileUrl).addTo(state.map);
+                }
             });
         }
 

@@ -248,8 +248,8 @@ def get_mendanha_frames():
     try:
         files = os.listdir(MENDANHA_DIR)
         files = [f for f in files if f.endswith('.png') and sanitize_filename(f)]
-        files.sort(reverse=True)
-        files = files[:20]
+        files.sort()  # Ordem cronológica (mais antigo primeiro)
+        files = files[-20:]  # Pegar os 20 mais recentes
         return jsonify({'frames': files, 'count': len(files)})
     except Exception as e:
         return jsonify({'error': 'Erro interno'}), 500

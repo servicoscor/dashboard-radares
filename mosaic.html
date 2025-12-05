@@ -493,8 +493,8 @@
                 logo.src = isDarkMode ? 'logo-cor.png' : 'logo-cor-azul.png';
             }
             
-            // Trocar mapas do mosaico
-            if (typeof switchMosaicMaps === 'function' && radarState.mendanha.map) {
+            // Trocar mapas do mosaico (só se já foram inicializados)
+            if (typeof radarState !== 'undefined' && radarState.mendanha && radarState.mendanha.map) {
                 switchMosaicMaps(!isDarkMode);
             }
         }
@@ -505,14 +505,11 @@
             applyTheme();
         };
         
-        // Aplicar tema salvo ao carregar
-        applyTheme();
-        
         const RADAR_CONFIG = {
             mendanha: {
                 bounds: [[-24.8, -46.5], [-20.8, -40.5]],
-                center: [-22.9, -43.5],
-                zoom: 8,
+                center: [-22.75, -43.4],
+                zoom: 9,
                 apiFrames: '/api/frames/mendanha',
                 apiFrame: '/api/frame/mendanha/'
             },
@@ -545,6 +542,9 @@
                 imagesReady: false 
             }
         };
+        
+        // Aplicar tema salvo ao carregar (depois de radarState existir)
+        applyTheme();
 
         // Detectar se é mobile
         function isMobile() {
@@ -596,9 +596,12 @@
             
             let loadedCount = 0;
             
+            // Filtro de chuva para Mendanha (remover umidade)
+            const filterParam = (radar === 'mendanha') ? '?filter=rain' : '';
+            
             for (let i = 0; i < state.frames.length; i++) {
                 const filename = state.frames[i];
-                const url = config.apiFrame + filename;
+                const url = config.apiFrame + filename + filterParam;
                 
                 await new Promise((resolve) => {
                     const img = new Image();
@@ -667,9 +670,21 @@
         async function loadFrames(radar) {
             const config = RADAR_CONFIG[radar];
             const state = radarState[radar];
+            const loading = document.getElementById(`loading-${radar}`);
             
             try {
-                const res = await fetch(config.apiFrames);
+                loading.querySelector('div:last-child').textContent = 'Conectando...';
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                
+                const res = await fetch(config.apiFrames, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                
                 const data = await res.json();
                 state.frames = data.frames || [];
                 
@@ -677,10 +692,14 @@
                     await createAllOverlays(radar);
                     showFrame(radar, 0);
                     startPlayback(radar);
+                } else {
+                    loading.querySelector('div:last-child').textContent = 'Sem dados';
+                    setTimeout(() => { loading.style.display = 'none'; }, 2000);
                 }
             } catch (e) {
                 console.error(`Erro ao carregar frames ${radar}:`, e);
-                document.getElementById(`loading-${radar}`).style.display = 'none';
+                loading.querySelector('div:last-child').textContent = 'Erro ao carregar';
+                setTimeout(() => { loading.style.display = 'none'; }, 3000);
             }
         }
 

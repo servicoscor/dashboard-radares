@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import requests
 from io import BytesIO
 from functools import wraps
+from PIL import Image
+import numpy as np
 
 app = Flask(__name__)
 
@@ -34,9 +36,9 @@ ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'cor_rio_radar_2024_token_seguro')
 rate_limit_store = {}
 RATE_LIMIT_WINDOW = 60  # segundos
 RATE_LIMIT_MAX_REQUESTS = {
-    'gif': 5,      # 5 GIFs por minuto
-    'sync': 2,     # 2 syncs por minuto
-    'default': 100 # 100 requests por minuto
+    'gif': 10,      # 10 GIFs por minuto
+    'sync': 5,      # 5 syncs por minuto
+    'default': 500  # 500 requests por minuto (aumentado para DEV)
 }
 
 # ============================================
@@ -70,6 +72,61 @@ if not FTP_CONFIG['password']:
 
 last_sync = {'mendanha': None, 'sumare': None}
 MAX_HOURS = 24
+
+# ============================================
+# FILTRO DE CORES - REMOVER UMIDADE (AZUL)
+# ============================================
+
+def filter_rain_only(image_path):
+    """
+    Filtra a imagem do radar para mostrar apenas chuva (verde ou mais intenso).
+    Remove os tons azuis que representam apenas umidade.
+    
+    Baseado na legenda oficial:
+    - Azul claro/escuro: 0.10 - 1 mm/h (umidade, não chuva)
+    - Verde: ~5 mm/h (chuva leve) - MANTER
+    - Amarelo/Laranja: 10-100 mm/h (chuva moderada/forte) - MANTER
+    - Vermelho/Magenta: >100 mm/h (chuva muito forte) - MANTER
+    """
+    try:
+        img = Image.open(image_path).convert('RGBA')
+        data = np.array(img)
+        
+        # Separar canais
+        r, g, b, a = data[:,:,0], data[:,:,1], data[:,:,2], data[:,:,3]
+        
+        # Detectar pixels azuis (umidade):
+        # - Azul é dominante (B > R e B > G)
+        # - Ou tons de ciano/azul claro
+        # Tons azuis típicos do radar: RGB aproximados
+        # - Azul escuro: ~(0-50, 50-100, 150-255)
+        # - Azul claro/ciano: ~(0-100, 100-200, 200-255)
+        
+        # Criar máscara para pixels azuis (umidade)
+        # Pixel é azul se: B > 100 AND B > R AND B >= G
+        blue_mask = (b > 100) & (b > r) & (b >= g)
+        
+        # Também remover ciano claro (onde G e B são altos mas R é baixo)
+        cyan_mask = (b > 150) & (g > 150) & (r < 100)
+        
+        # Combinar máscaras
+        remove_mask = blue_mask | cyan_mask
+        
+        # Tornar pixels azuis transparentes
+        data[remove_mask, 3] = 0
+        
+        # Criar nova imagem
+        filtered_img = Image.fromarray(data, 'RGBA')
+        
+        # Salvar em buffer
+        buffer = BytesIO()
+        filtered_img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        return buffer
+    except Exception as e:
+        print(f'Erro no filtro de chuva: {e}')
+        return None
 
 # ============================================
 # FUNÇÕES DE SEGURANÇA
@@ -257,7 +314,7 @@ def get_mendanha_frames():
 @app.route('/api/frame/mendanha/<filename>')
 @rate_limit('default')
 def get_mendanha_frame(filename):
-    """Serve uma imagem do Mendanha"""
+    """Serve uma imagem do Mendanha (com filtro opcional)"""
     # CORREÇÃO: Validar filename contra Path Traversal
     safe_filename = sanitize_filename(filename)
     if not safe_filename:
@@ -271,6 +328,16 @@ def get_mendanha_frame(filename):
         return jsonify({'error': 'Acesso negado'}), 403
     
     if os.path.exists(filepath):
+        # Verificar se filtro de chuva está ativo
+        filter_rain = request.args.get('filter', '') == 'rain'
+        
+        if filter_rain:
+            filtered = filter_rain_only(filepath)
+            if filtered:
+                response = send_file(filtered, mimetype='image/png')
+                response.headers['Cache-Control'] = 'public, max-age=60'
+                return response
+        
         response = send_file(filepath, mimetype='image/png')
         return response
     return jsonify({'error': 'Arquivo não encontrado'}), 404

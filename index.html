@@ -591,20 +591,22 @@
                 <div class="toggle-row"><span class="toggle-label">Marcador radar</span><div class="toggle" id="toggleMarker"></div></div>
                 <div class="toggle-row" id="arrowsToggleRow"><span class="toggle-label">Setas de direção</span><div class="toggle active" id="toggleArrows"></div></div>
                 <div class="toggle-row"><span class="toggle-label">Opacidade alta</span><div class="toggle" id="toggleOpacity"></div></div>
+                <div class="toggle-row" id="filterRainRow"><span class="toggle-label">Filtrar umidade (só chuva)</span><div class="toggle active" id="toggleFilterRain"></div></div>
             </div>
             <div class="card" id="nucleiCard">
                 <div class="card-title">Núcleos Detectados</div>
                 <div class="nucleus-list" id="nucleusList"><div class="loading">Analisando frames...</div></div>
             </div>
             <div class="card">
-                <div class="card-title">Legenda dBZ</div>
+                <div class="card-title">Legenda (mm/h)</div>
                 <div class="legend">
-                    <div class="legend-item"><div class="legend-color" style="background:#ff00ff"></div>Extremo</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ff0000"></div>Muito Forte</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ff9900"></div>Forte</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div>Moderado</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#008800"></div>Leve</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#00ff00"></div>Fraco</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ff00ff"></div>>500</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ff0000"></div>100-500</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ff9900"></div>50-100</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div>10-50</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#00ff00"></div>5-10</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#00ffff"></div>1-5</div>
+                    <div class="legend-item"><div class="legend-color" style="background:#0066ff; opacity:0.5"></div>&lt;1 (umidade)</div>
                 </div>
             </div>
         </div>
@@ -638,8 +640,8 @@
         const RADAR_CONFIG = {
             mendanha: {
                 bounds: [[-24.8, -46.5], [-20.8, -40.5]],
-                center: [-22.9, -43.5],
-                zoom: 8,
+                center: [-22.75, -43.4],  // Ajustado para focar no Rio
+                zoom: 9,  // Zoom mais próximo
                 markerPos: [-22.8167, -43.5500],
                 markerName: 'Radar Mendanha',
                 apiFrames: '/api/frames/mendanha',
@@ -671,6 +673,7 @@
         let currentRadar = 'mendanha';
         let frameOverlays = [];
         let imagesReady = false;
+        let filterRainOnly = true;  // Filtro de chuva ativado por padrão
 
         // Sidebar toggle mobile
         document.getElementById('sidebarToggle').onclick = function() {
@@ -751,9 +754,10 @@
 
         // Ajustar zoom inicial baseado no tamanho da tela
         function getInitialZoom() {
-            if (window.innerWidth <= 480) return 7;
-            if (window.innerWidth <= 768) return 7;
-            return 8;
+            const baseZoom = RADAR_CONFIG[currentRadar]?.zoom || 9;
+            if (window.innerWidth <= 480) return baseZoom - 1;
+            if (window.innerWidth <= 768) return baseZoom - 1;
+            return baseZoom;
         }
 
         map = L.map('map', { zoomControl: window.innerWidth > 768 }).setView(RADAR_CONFIG.mendanha.center, getInitialZoom());
@@ -782,9 +786,12 @@
             
             let loadedCount = 0;
             
+            // Adicionar parâmetro de filtro apenas para Mendanha
+            const filterParam = (filterRainOnly && radar === 'mendanha') ? '?filter=rain' : '';
+            
             for (let i = 0; i < frames.length; i++) {
                 const filename = frames[i];
-                const url = config.apiFrame + filename;
+                const url = config.apiFrame + filename + filterParam;
                 
                 await new Promise((resolve) => {
                     const img = new Image();
@@ -953,6 +960,9 @@
                     document.getElementById('niteroiInfo').style.display = 'none';
                 }
                 
+                // Atualizar visibilidade do filtro de chuva
+                updateFilterVisibility();
+                
                 loadFrames(currentRadar);
                 map.invalidateSize();
             }
@@ -1007,6 +1017,33 @@
             }
         };
 
+        // Toggle filtro de chuva (só Mendanha)
+        document.getElementById('toggleFilterRain').onclick = async function() {
+            this.classList.toggle('active');
+            filterRainOnly = this.classList.contains('active');
+            
+            // Recarregar imagens se estiver no Mendanha
+            if (currentRadar === 'mendanha' && frames.length > 0) {
+                stopPlayback();
+                await createAllOverlays('mendanha');
+                showFrame(0);
+                startPlayback();
+                
+                // Reanalisar se filtro ativo
+                if (filterRainOnly) {
+                    analyzeAllFrames();
+                }
+            }
+        };
+        
+        // Mostrar/esconder opção de filtro baseado no radar
+        function updateFilterVisibility() {
+            const filterRow = document.getElementById('filterRainRow');
+            if (filterRow) {
+                filterRow.style.display = (currentRadar === 'mendanha') ? 'flex' : 'none';
+            }
+        }
+
         function detectNuclei(imageData, width, height) {
             const data = imageData.data;
             const visited = new Set();
@@ -1014,13 +1051,24 @@
 
             function isRainPixel(r, g, b, a) {
                 if (a < 100) return false;
-                if (g > 200 && r < 100 && b < 100) return { intensity: 1 };
-                if (g > 100 && g < 200 && r < 100 && b < 100) return { intensity: 2 };
-                if (r > 200 && g > 200 && b < 100) return { intensity: 3 };
-                if (r > 200 && g > 100 && g < 200 && b < 100) return { intensity: 4 };
-                if (r > 200 && g < 100 && b < 100) return { intensity: 5 };
-                if (r > 200 && b > 200 && g < 100) return { intensity: 6 };
-                if (b > 150 && g > 150 && r < 100) return { intensity: 2 };
+                
+                // Se filtro de chuva ativo, ignorar pixels azuis (umidade)
+                if (filterRainOnly) {
+                    // Ignorar azul/ciano (umidade)
+                    if (b > 100 && b > r && b >= g) return false;
+                    if (b > 150 && g > 150 && r < 100) return false;
+                }
+                
+                if (g > 200 && r < 100 && b < 100) return { intensity: 1 };  // Verde claro
+                if (g > 100 && g < 200 && r < 100 && b < 100) return { intensity: 2 };  // Verde escuro
+                if (r > 200 && g > 200 && b < 100) return { intensity: 3 };  // Amarelo
+                if (r > 200 && g > 100 && g < 200 && b < 100) return { intensity: 4 };  // Laranja
+                if (r > 200 && g < 100 && b < 100) return { intensity: 5 };  // Vermelho
+                if (r > 200 && b > 200 && g < 100) return { intensity: 6 };  // Magenta
+                
+                // Ciano/azul claro (só se filtro desativado)
+                if (!filterRainOnly && b > 150 && g > 150 && r < 100) return { intensity: 1 };
+                
                 return false;
             }
 
@@ -1295,6 +1343,7 @@
 
         // Iniciar com Mendanha
         loadFrames('mendanha');
+        updateFilterVisibility();  // Mostrar opção de filtro para Mendanha
         
         // Auto-refresh a cada 2 minutos
         setInterval(() => {

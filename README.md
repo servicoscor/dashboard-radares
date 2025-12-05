@@ -3,7 +3,7 @@
 Sistema de visualização e análise de tendência de chuva em tempo real para o Centro de Operações Rio.
 
 ![Status](https://img.shields.io/badge/status-produção-green)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.3.0-blue)
 ![Python](https://img.shields.io/badge/python-3.11+-yellow)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -44,23 +44,26 @@ O **Radar Nowcast** é uma plataforma web desenvolvida para o Centro de Operaç�
 
 ### Radares Integrados
 
-| Radar | Fonte | Cobertura | Frames |
+| Radar | Fonte | Cobertura | Método |
 |-------|-------|-----------|--------|
-| **Mendanha** | INEA (FTP) | Região Metropolitana RJ | 20 |
-| **Sumaré** | AlertaRio | Cidade do Rio de Janeiro | 20 |
-| **DCNIT** | Defesa Civil Niterói | Niterói e região | Tempo real |
+| **Mendanha** | INEA (FTP) | Região Metropolitana RJ | API com filtro de chuva |
+| **Sumaré** | AlertaRio | Cidade do Rio de Janeiro | API proxy |
+| **Niterói** | Defesa Civil Niterói | Niterói e região | Iframe integrado |
 
 ### Recursos Principais
 
 - 🎬 **Animação Suave** - Pré-carregamento de frames para reprodução fluida
 - 🧭 **Setas de Direção** - Análise automática de movimento dos núcleos de chuva
-- 📊 **Detecção de Núcleos** - Identificação e classificação por intensidade (dBZ)
+- 📊 **Detecção de Núcleos** - Identificação e classificação por intensidade (mm/h)
+- 🌧️ **Filtro de Chuva** - Remove umidade (azul) e mostra apenas precipitação real
+- 🌙 **Modo Escuro/Claro** - Tema com paleta oficial da Prefeitura do Rio
 - 🗺️ **5 Tipos de Mapa** - Escuro, Claro, Ruas, Satélite, Topográfico
 - 📥 **Exportação GIF** - Download de animações para compartilhamento
 - ⛶ **Modo Fullscreen** - Visualização expandida sem sidebar
 - 📱 **Página Mosaico** - 3 radares simultâneos com layouts configuráveis
 - 🔄 **Auto-refresh** - Atualização automática a cada 2 minutos
 - 🧹 **Limpeza Automática** - Remoção de arquivos com mais de 24h
+- 📱 **Design Responsivo** - Funciona em desktop, tablet e celular
 
 ### Layouts do Mosaico
 
@@ -131,6 +134,7 @@ Layout 1: [1][2][3]     Layout 2: [  1  ]     Layout 3: [1][2]     Layout 4: [1]
 - **Gunicorn** - WSGI HTTP Server (produção)
 - **Flask-CORS** - Cross-Origin Resource Sharing
 - **Pillow** - Processamento de imagens (GIF)
+- **NumPy** - Processamento de arrays (filtro de chuva)
 - **Requests** - Cliente HTTP
 
 ### Frontend
@@ -169,7 +173,7 @@ Layout 1: [1][2][3]     Layout 2: [  1  ]     Layout 3: [1][2]     Layout 4: [1]
 
 ```bash
 cd /var/www
-sudo git clone https://github.com/mcoutinho2512/radar-nowcast.git
+sudo git clone https://github.com/servicoscor/dashboard-radares.git radar-nowcast
 cd radar-nowcast
 ```
 
@@ -178,7 +182,7 @@ cd radar-nowcast
 ```bash
 sudo python3 -m venv venv
 sudo venv/bin/pip install --upgrade pip
-sudo venv/bin/pip install flask flask-cors requests pillow gunicorn
+sudo venv/bin/pip install flask flask-cors requests pillow gunicorn numpy
 ```
 
 ### 3. Criar Diretórios
@@ -297,8 +301,12 @@ GET /api/frames/sumare
 
 ```http
 GET /api/frame/mendanha/{filename}
+GET /api/frame/mendanha/{filename}?filter=rain
 GET /api/frame/sumare/{filename}
 ```
+
+**Parâmetros Query:**
+- `filter=rain` - Remove pixels de umidade (azul), mostrando apenas precipitação real (apenas Mendanha)
 
 **Resposta:** Imagem PNG
 
@@ -378,7 +386,8 @@ GET /api/admin/status?token=SEU_TOKEN
 ├── index.html          # Página principal
 ├── mosaic.html         # Página mosaico (3 radares)
 ├── server.py           # Backend Flask
-├── logo-cor.png        # Logo COR Rio
+├── logo-cor.png        # Logo COR Rio (modo escuro)
+├── logo-cor-azul.png   # Logo COR Rio (modo claro)
 ├── venv/               # Ambiente virtual Python
 ├── cache/
 │   ├── mendanha/       # Frames do radar Mendanha
@@ -443,12 +452,16 @@ curl http://localhost:5000/api/status
 
 - [x] Radar Mendanha (INEA)
 - [x] Radar Sumaré (AlertaRio)
-- [x] DCNIT Niterói (iframe)
+- [x] Radar Niterói (Defesa Civil)
 - [x] Detecção de núcleos com setas
 - [x] Exportação GIF
 - [x] Modo fullscreen
 - [x] Página mosaico
 - [x] Correções de segurança
+- [x] Filtro de chuva (remove umidade)
+- [x] Modo escuro/claro
+- [x] Paleta oficial Prefeitura Rio
+- [x] Design responsivo (mobile)
 - [ ] SSL/HTTPS (Let's Encrypt)
 - [ ] Histórico de eventos
 - [ ] Alertas automáticos
@@ -477,7 +490,8 @@ Este projeto é de uso interno do Centro de Operações Rio (COR).
 
 **Centro de Operações Rio**
 - Website: [cor.rio](https://cor.rio)
-- GitHub: [@mcoutinho2512](https://github.com/mcoutinho2512)
+- Dashboard: [dashboardradar.cor.rio](https://dashboardradar.cor.rio)
+- GitHub: [@servicoscor](https://github.com/servicoscor)
 
 ---
 

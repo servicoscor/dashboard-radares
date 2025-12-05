@@ -190,6 +190,55 @@
             border: 1px solid var(--border-color);
             transition: background 0.3s ease, border-color 0.3s ease;
         }
+        
+        /* Legenda overlay no mapa */
+        .legend-overlay {
+            position: absolute;
+            bottom: 80px;
+            left: 10px;
+            background: rgba(15, 20, 25, 0.9);
+            padding: 8px 12px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-size: 11px;
+            border: 1px solid var(--border-color);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        body.light-mode .legend-overlay {
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .legend-overlay-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-primary);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .legend-overlay-items {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .legend-overlay-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-overlay-color {
+            width: 20px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .legend-overlay-label {
+            color: var(--text-secondary);
+            font-size: 10px;
+        }
+        .legend-overlay-filtered {
+            opacity: 0.5;
+            font-style: italic;
+        }
         .ctrl-btn { 
             width: 32px; 
             height: 32px; 
@@ -389,6 +438,15 @@
             
             /* Esconder card de mapa na sidebar (já está na barra inferior) */
             #mapCard { display: none; }
+            
+            .legend-overlay {
+                bottom: 75px;
+                left: 8px;
+                padding: 6px 10px;
+            }
+            .legend-overlay-title { font-size: 9px; margin-bottom: 4px; }
+            .legend-overlay-label { font-size: 9px; }
+            .legend-overlay-color { width: 16px; height: 8px; }
         }
 
         /* ============================================ */
@@ -447,6 +505,16 @@
             .mobile-bottom-bar { padding: 6px 8px; gap: 6px; }
             .mobile-radar-selector .radar-btn { padding: 8px 6px; font-size: 0.75rem; }
             .mobile-map-selector .map-btn { padding: 5px 10px; font-size: 0.65rem; }
+            
+            .legend-overlay {
+                bottom: 115px;
+                left: 5px;
+                padding: 5px 8px;
+            }
+            .legend-overlay-items { gap: 2px; }
+            .legend-overlay-title { font-size: 8px; margin-bottom: 3px; }
+            .legend-overlay-label { font-size: 8px; }
+            .legend-overlay-color { width: 14px; height: 6px; }
         }
 
         /* ============================================ */
@@ -521,6 +589,22 @@
                 <div class="loading-spinner"></div>
                 <div id="loadingText">Carregando imagens...</div>
             </div>
+            
+            <!-- Legenda overlay no mapa -->
+            <div class="legend-overlay" id="legendOverlay">
+                <div class="legend-overlay-title">Precipitação (mm/h)</div>
+                <div class="legend-overlay-items">
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:linear-gradient(to right, #ff00ff, #ffaaff)"></div><span class="legend-overlay-label">500-1100</span></div>
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:#ff0000"></div><span class="legend-overlay-label">100-500</span></div>
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:#ff9900"></div><span class="legend-overlay-label">50-100</span></div>
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:#ffff00"></div><span class="legend-overlay-label">10-50</span></div>
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:#00cc00"></div><span class="legend-overlay-label">5-10</span></div>
+                    <div class="legend-overlay-item"><div class="legend-overlay-color" style="background:#00ff00"></div><span class="legend-overlay-label">1-5</span></div>
+                    <div class="legend-overlay-item legend-overlay-filtered"><div class="legend-overlay-color" style="background:#00ffff"></div><span class="legend-overlay-label">0.5-1 (filtrado)</span></div>
+                    <div class="legend-overlay-item legend-overlay-filtered"><div class="legend-overlay-color" style="background:#0099ff"></div><span class="legend-overlay-label">0.1-0.5 (filtrado)</span></div>
+                </div>
+            </div>
+            
             <iframe id="externalRadar" src=""></iframe>
             <div class="iframe-cropped-container" id="niteroiContainer">
                 <iframe id="niteroiRadar" src=""></iframe>
@@ -596,18 +680,6 @@
             <div class="card" id="nucleiCard">
                 <div class="card-title">Núcleos Detectados</div>
                 <div class="nucleus-list" id="nucleusList"><div class="loading">Analisando frames...</div></div>
-            </div>
-            <div class="card">
-                <div class="card-title">Legenda (mm/h)</div>
-                <div class="legend">
-                    <div class="legend-item"><div class="legend-color" style="background:#ff00ff"></div>>500</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ff0000"></div>100-500</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ff9900"></div>50-100</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div>10-50</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#00ff00"></div>5-10</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#00ffff"></div>1-5</div>
-                    <div class="legend-item"><div class="legend-color" style="background:#0066ff; opacity:0.5"></div>&lt;1 (umidade)</div>
-                </div>
             </div>
         </div>
     </div>
@@ -925,6 +997,7 @@
                 document.getElementById('configCard').style.display = 'none';
                 document.getElementById('nucleiCard').style.display = 'none';
                 document.getElementById('exportCard').style.display = 'none';
+                document.getElementById('legendOverlay').style.display = 'none';
                 
                 // Esconder seletor de mapa no mobile quando Niterói
                 document.querySelector('.mobile-map-selector').style.display = 'none';
@@ -938,6 +1011,7 @@
                 document.getElementById('configCard').style.display = 'block';
                 document.getElementById('nucleiCard').style.display = 'block';
                 document.getElementById('exportCard').style.display = 'block';
+                document.getElementById('legendOverlay').style.display = 'block';
                 
                 // Mostrar seletor de mapa no mobile
                 document.querySelector('.mobile-map-selector').style.display = 'flex';

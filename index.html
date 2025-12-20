@@ -311,6 +311,44 @@
         .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Alerta de atraso do radar */
+        .delay-alert {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 59, 48, 0.95);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 1500;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(255, 59, 48, 0.4);
+            animation: pulse-alert 2s infinite;
+        }
+        .delay-alert.warning {
+            background: rgba(255, 149, 0, 0.95);
+            box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
+        }
+        .delay-alert-icon { font-size: 1.2rem; }
+        .delay-alert-time { font-weight: 700; }
+        @keyframes pulse-alert {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+        @media (max-width: 768px) {
+            .delay-alert {
+                top: 60px;
+                padding: 8px 14px;
+                font-size: 0.8rem;
+                max-width: 90%;
+            }
+        }
+
         /* ============================================ */
         /* MOBILE BOTTOM BAR - Radar e Mapa selector */
         /* ============================================ */
@@ -585,6 +623,10 @@
         </header>
         <div class="map-area">
             <div id="map"></div>
+            <div class="delay-alert" id="delayAlert">
+                <span class="delay-alert-icon">⚠️</span>
+                <span>Radar Mendanha sem atualização há <span class="delay-alert-time" id="delayTime">0</span> minutos</span>
+            </div>
             <div class="loading-overlay" id="loadingOverlay" style="display:none;">
                 <div class="loading-spinner"></div>
                 <div id="loadingText">Carregando imagens...</div>
@@ -746,6 +788,9 @@
         let frameOverlays = [];
         let imagesReady = false;
         let filterRainOnly = true;  // Filtro de chuva ativado por padrão
+        let currentDelayMinutes = 0;  // Atraso atual do radar em minutos
+        const DELAY_WARNING_THRESHOLD = 30;  // Mostrar alerta após 30 min
+        const DELAY_CRITICAL_THRESHOLD = 60;  // Alerta crítico após 60 min
 
         // Sidebar toggle mobile
         document.getElementById('sidebarToggle').onclick = function() {
@@ -988,7 +1033,7 @@
                 document.getElementById('niteroiContainer').style.display = 'block';
                 document.getElementById('niteroiRadar').src = 'https://radar.niteroi.rj.gov.br/';
                 document.getElementById('controls').style.display = 'none';
-                
+
                 document.getElementById('radarTitle').textContent = 'Radar Niterói';
                 document.getElementById('mendanhaInfo').style.display = 'none';
                 document.getElementById('sumareInfo').style.display = 'none';
@@ -998,7 +1043,8 @@
                 document.getElementById('nucleiCard').style.display = 'none';
                 document.getElementById('exportCard').style.display = 'none';
                 document.getElementById('legendOverlay').style.display = 'none';
-                
+                document.getElementById('delayAlert').style.display = 'none';
+
                 // Esconder seletor de mapa no mobile quando Niterói
                 document.querySelector('.mobile-map-selector').style.display = 'none';
             } else {
@@ -1115,6 +1161,27 @@
             const filterRow = document.getElementById('filterRainRow');
             if (filterRow) {
                 filterRow.style.display = (currentRadar === 'mendanha') ? 'flex' : 'none';
+            }
+        }
+
+        // Atualizar alerta de atraso do radar
+        function updateDelayAlert(delayMinutes) {
+            const alertEl = document.getElementById('delayAlert');
+            const delayTimeEl = document.getElementById('delayTime');
+
+            if (currentRadar !== 'mendanha' || delayMinutes === null || delayMinutes < DELAY_WARNING_THRESHOLD) {
+                alertEl.style.display = 'none';
+                return;
+            }
+
+            delayTimeEl.textContent = delayMinutes;
+            alertEl.style.display = 'flex';
+
+            // Crítico (vermelho) se > 60 min, warning (laranja) se > 30 min
+            if (delayMinutes >= DELAY_CRITICAL_THRESHOLD) {
+                alertEl.classList.remove('warning');
+            } else {
+                alertEl.classList.add('warning');
             }
         }
 
@@ -1334,28 +1401,33 @@
 
         async function loadFrames(radar) {
             const config = RADAR_CONFIG[radar];
-            
+
             try {
                 const res = await fetch(config.apiFrames);
                 const data = await res.json();
                 frames = data.frames || [];
-                
+
                 if (radar === 'mendanha') {
                     document.getElementById('frameCount').textContent = frames.length;
+                    // Atualizar alerta de atraso
+                    currentDelayMinutes = data.delay_minutes;
+                    updateDelayAlert(data.delay_minutes);
                 } else {
                     document.getElementById('sumareFrameCount').textContent = frames.length;
+                    // Esconder alerta quando não é Mendanha
+                    updateDelayAlert(null);
                 }
-                
+
                 currentFrame = 0;
-                
+
                 if (frames.length > 0) {
                     await createAllOverlays(radar);
                     showFrame(0);
                     await analyzeFrames(radar);
                     startPlayback();
                 }
-            } catch (e) { 
-                console.error('Erro ao carregar frames:', e); 
+            } catch (e) {
+                console.error('Erro ao carregar frames:', e);
             }
         }
 
@@ -1415,10 +1487,34 @@
             setTimeout(() => map.invalidateSize(), 100);
         });
 
-        // Iniciar com Mendanha
-        loadFrames('mendanha');
-        updateFilterVisibility();  // Mostrar opção de filtro para Mendanha
-        
+        // Inicialização inteligente: verificar se Mendanha está atualizado
+        async function initRadar() {
+            try {
+                // Verificar status do Mendanha primeiro
+                const res = await fetch('/api/frames/mendanha');
+                const data = await res.json();
+                const delayMinutes = data.delay_minutes;
+
+                if (delayMinutes !== null && delayMinutes >= DELAY_WARNING_THRESHOLD) {
+                    // Mendanha desatualizado - iniciar com Sumaré
+                    console.log(`Mendanha desatualizado (${delayMinutes} min), iniciando com Sumaré`);
+                    switchRadar('sumare');
+                } else {
+                    // Mendanha OK - iniciar normalmente
+                    loadFrames('mendanha');
+                    updateFilterVisibility();
+                }
+            } catch (e) {
+                // Em caso de erro, tentar Mendanha mesmo assim
+                console.error('Erro ao verificar status:', e);
+                loadFrames('mendanha');
+                updateFilterVisibility();
+            }
+        }
+
+        // Iniciar
+        initRadar();
+
         // Auto-refresh a cada 2 minutos
         setInterval(() => {
             if (currentRadar === 'mendanha' || currentRadar === 'sumare') {

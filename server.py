@@ -27,7 +27,10 @@ ALLOWED_ORIGINS = [
     'http://localhost:5000',
     'http://127.0.0.1:5000'
 ]
-CORS(app, origins=ALLOWED_ORIGINS)
+CORS(app, resources={
+    r"/api/*": {"origins": "*"},
+    r"/*": {"origins": ALLOWED_ORIGINS}
+})
 
 # Token para endpoints administrativos (gere um novo com: python -c "import secrets; print(secrets.token_hex(32))")
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'cor_rio_radar_2024_token_seguro')
@@ -307,7 +310,30 @@ def get_mendanha_frames():
         files = [f for f in files if f.endswith('.png') and sanitize_filename(f)]
         files.sort()  # Ordem cronológica (mais antigo primeiro)
         files = files[-20:]  # Pegar os 20 mais recentes
-        return jsonify({'frames': files, 'count': len(files)})
+
+        # Extrair timestamp do último frame para detectar atraso
+        latest_timestamp = None
+        delay_minutes = None
+        if files:
+            latest_file = files[-1]
+            # Formato: MDN-YYYYMMDD-HHMM_...
+            match = re.match(r'MDN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})', latest_file)
+            if match:
+                year, month, day, hour, minute = match.groups()
+                latest_timestamp = f"{year}-{month}-{day}T{hour}:{minute}:00"
+                try:
+                    frame_time = datetime(int(year), int(month), int(day), int(hour), int(minute))
+                    now = datetime.now()
+                    delay_minutes = int((now - frame_time).total_seconds() / 60)
+                except:
+                    pass
+
+        return jsonify({
+            'frames': files,
+            'count': len(files),
+            'latest_timestamp': latest_timestamp,
+            'delay_minutes': delay_minutes
+        })
     except Exception as e:
         return jsonify({'error': 'Erro interno'}), 500
 

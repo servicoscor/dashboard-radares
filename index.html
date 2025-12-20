@@ -1057,8 +1057,7 @@
                 document.getElementById('configCard').style.display = 'block';
                 document.getElementById('nucleiCard').style.display = 'block';
                 document.getElementById('exportCard').style.display = 'block';
-                document.getElementById('legendOverlay').style.display = 'block';
-                
+
                 // Mostrar seletor de mapa no mobile
                 document.querySelector('.mobile-map-selector').style.display = 'flex';
                 
@@ -1073,11 +1072,13 @@
                     document.getElementById('mendanhaInfo').style.display = 'block';
                     document.getElementById('sumareInfo').style.display = 'none';
                     document.getElementById('niteroiInfo').style.display = 'none';
+                    document.getElementById('legendOverlay').style.display = 'block';
                 } else if (currentRadar === 'sumare') {
                     document.getElementById('radarTitle').textContent = 'Radar Sumaré';
                     document.getElementById('mendanhaInfo').style.display = 'none';
                     document.getElementById('sumareInfo').style.display = 'block';
                     document.getElementById('niteroiInfo').style.display = 'none';
+                    document.getElementById('legendOverlay').style.display = 'none';
                 }
                 
                 // Atualizar visibilidade do filtro de chuva

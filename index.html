@@ -1235,6 +1235,9 @@
 
             for (let y = 0; y < height; y += 4) {
                 for (let x = 0; x < width; x += 4) {
+                    // Ignorar área da legenda (canto superior esquerdo) - expandida
+                    if (x < 200 && y < 500) continue;
+
                     const key = `${x},${y}`;
                     if (visited.has(key)) continue;
                     const idx = (y * width + x) * 4;
@@ -1243,7 +1246,12 @@
                         if (cluster.length >= 80) {
                             let sumX = 0, sumY = 0;
                             cluster.forEach(p => { sumX += p.x; sumY += p.y; });
-                            nuclei.push({ x: sumX / cluster.length, y: sumY / cluster.length, size: cluster.length, intensity: avgIntensity });
+                            const centerX = sumX / cluster.length;
+                            const centerY = sumY / cluster.length;
+                            // Filtrar núcleos na área da legenda
+                            if (centerX >= 200 || centerY >= 500) {
+                                nuclei.push({ x: centerX, y: centerY, size: cluster.length, intensity: avgIntensity });
+                            }
                         }
                     }
                 }
@@ -1308,18 +1316,23 @@
             drawArrowsForFrame(currentFrame);
         }
 
+        // Configurações de tendência
+        const TREND_FRAMES = 5;  // Quantos frames recentes usar para tendência
+        const MIN_SPEED = 2;     // Velocidade mínima para considerar movimento
+
         function calculateMovements(radar) {
             const framesData = allFramesData[radar];
-            
+
+            // Passo 1: Calcular movimentos frame-a-frame
             for (let i = 0; i < framesData.length - 1; i++) {
                 const current = framesData[i];
                 const next = framesData[i + 1];
-                
-                current.movements = [];
-                
+
+                current.rawMovements = [];
+
                 current.nuclei.forEach(nucleus => {
                     let bestMatch = null, bestDist = Infinity;
-                    
+
                     next.nuclei.forEach(nextNucleus => {
                         const dist = Math.hypot(nucleus.x - nextNucleus.x, nucleus.y - nextNucleus.y);
                         if (dist < bestDist && dist < 150) {
@@ -1327,23 +1340,83 @@
                             bestMatch = nextNucleus;
                         }
                     });
-                    
+
                     if (bestMatch) {
                         const dx = bestMatch.x - nucleus.x;
                         const dy = bestMatch.y - nucleus.y;
                         const speed = Math.hypot(dx, dy);
-                        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-                        
-                        if (speed > 2) {
-                            current.movements.push({
+
+                        if (speed >= MIN_SPEED) {
+                            current.rawMovements.push({
                                 x: nucleus.x,
                                 y: nucleus.y,
-                                dx, dy, speed, angle,
+                                dx, dy, speed,
                                 intensity: nucleus.intensity,
                                 size: nucleus.size
                             });
                         }
                     }
+                });
+            }
+
+            // Passo 2: Calcular tendência para cada frame usando janela de frames recentes
+            for (let i = 0; i < framesData.length; i++) {
+                const current = framesData[i];
+                current.movements = [];
+
+                // Coletar movimentos dos últimos TREND_FRAMES frames
+                const recentMovements = [];
+                const startFrame = Math.max(0, i - TREND_FRAMES + 1);
+
+                for (let j = startFrame; j <= Math.min(i, framesData.length - 2); j++) {
+                    if (framesData[j].rawMovements) {
+                        framesData[j].rawMovements.forEach(m => {
+                            recentMovements.push({
+                                dx: m.dx,
+                                dy: m.dy,
+                                size: m.size
+                            });
+                        });
+                    }
+                }
+
+                if (recentMovements.length === 0) continue;
+
+                // Calcular tendência média dos frames recentes
+                let sumDx = 0, sumDy = 0, totalWeight = 0;
+                recentMovements.forEach(m => {
+                    const weight = Math.sqrt(m.size);
+                    sumDx += m.dx * weight;
+                    sumDy += m.dy * weight;
+                    totalWeight += weight;
+                });
+
+                if (totalWeight === 0) continue;
+
+                const trendDx = sumDx / totalWeight;
+                const trendDy = sumDy / totalWeight;
+                const trendSpeed = Math.hypot(trendDx, trendDy);
+                const trendAngle = Math.atan2(trendDy, trendDx) * 180 / Math.PI;
+
+                if (trendSpeed < MIN_SPEED) continue;
+
+                // Aplicar tendência apenas aos maiores núcleos (top 5)
+                const sortedNuclei = [...current.nuclei]
+                    .filter(n => n.size >= 200) // Mínimo de 200 pixels
+                    .sort((a, b) => b.size - a.size)
+                    .slice(0, 5); // Máximo 5 setas
+
+                sortedNuclei.forEach(nucleus => {
+                    current.movements.push({
+                        x: nucleus.x,
+                        y: nucleus.y,
+                        dx: trendDx,
+                        dy: trendDy,
+                        speed: trendSpeed,
+                        angle: trendAngle,
+                        intensity: nucleus.intensity,
+                        size: nucleus.size
+                    });
                 });
             }
         }

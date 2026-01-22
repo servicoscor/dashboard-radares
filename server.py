@@ -48,7 +48,7 @@ RATE_LIMIT_MAX_REQUESTS = {
 # CONFIGURAÇÃO DE DIRETÓRIOS
 # ============================================
 
-CACHE_DIR = '/var/www/radar-nowcast/cache'
+CACHE_DIR = os.environ.get('CACHE_DIR', '/var/www/radar-nowcast/cache')
 MENDANHA_DIR = os.path.join(CACHE_DIR, 'mendanha')
 SUMARE_DIR = os.path.join(CACHE_DIR, 'sumare')
 EXPORT_DIR = os.path.join(CACHE_DIR, 'exports')
@@ -531,6 +531,30 @@ def admin_status():
         'ftp_configured': bool(FTP_CONFIG['password']),
         'status': 'ok'
     })
+
+# ============================================
+# ROTAS PARA DESENVOLVIMENTO (ARQUIVOS ESTÁTICOS)
+# ============================================
+
+STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+
+@app.route('/')
+def serve_index():
+    """Serve index.html para desenvolvimento"""
+    return send_file(os.path.join(STATIC_DIR, 'index.html'))
+
+@app.route('/mosaic.html')
+def serve_mosaic():
+    """Serve mosaic.html para desenvolvimento"""
+    return send_file(os.path.join(STATIC_DIR, 'mosaic.html'))
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    """Serve arquivos estáticos (logos, etc)"""
+    filepath = os.path.join(STATIC_DIR, filename)
+    if os.path.exists(filepath) and not '..' in filename:
+        return send_file(filepath)
+    return jsonify({'error': 'Arquivo não encontrado'}), 404
 
 # ============================================
 # TRATAMENTO DE ERROS

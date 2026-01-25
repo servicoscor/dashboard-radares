@@ -340,8 +340,43 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.85; }
         }
+
+        /* Notificação de fallback automático */
+        .fallback-notification {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 212, 255, 0.95);
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 1600;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+            animation: slide-in 0.3s ease-out;
+        }
+        .fallback-notification.success {
+            background: rgba(0, 255, 136, 0.95);
+            box-shadow: 0 4px 12px rgba(0, 255, 136, 0.4);
+        }
+        @keyframes slide-in {
+            from { transform: translate(-50%, -20px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
         @media (max-width: 768px) {
             .delay-alert {
+                top: 60px;
+                padding: 8px 14px;
+                font-size: 0.8rem;
+                max-width: 90%;
+            }
+            .fallback-notification {
                 top: 60px;
                 padding: 8px 14px;
                 font-size: 0.8rem;
@@ -626,6 +661,10 @@
             <div class="delay-alert" id="delayAlert">
                 <span class="delay-alert-icon">⚠️</span>
                 <span>Radar Mendanha sem atualização há <span class="delay-alert-time" id="delayTime">0</span> minutos</span>
+            </div>
+            <div class="fallback-notification" id="fallbackNotification">
+                <span id="fallbackIcon">🔄</span>
+                <span id="fallbackMessage"></span>
             </div>
             <div class="loading-overlay" id="loadingOverlay" style="display:none;">
                 <div class="loading-spinner"></div>
@@ -1186,6 +1225,32 @@
             }
         }
 
+        // Mostrar notificação de fallback automático
+        function showFallbackNotification(type, message) {
+            const notification = document.getElementById('fallbackNotification');
+            const icon = document.getElementById('fallbackIcon');
+            const messageEl = document.getElementById('fallbackMessage');
+
+            // Definir ícone e estilo baseado no tipo
+            if (type === 'fallback') {
+                icon.textContent = '🔄';
+                notification.classList.remove('success');
+                messageEl.textContent = message;
+            } else if (type === 'return') {
+                icon.textContent = '✅';
+                notification.classList.add('success');
+                messageEl.textContent = message;
+            }
+
+            // Mostrar notificação
+            notification.style.display = 'flex';
+
+            // Esconder após 5 segundos
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        }
+
         function detectNuclei(imageData, width, height) {
             const data = imageData.data;
             const visited = new Set();
@@ -1589,10 +1654,40 @@
         // Iniciar
         initRadar();
 
-        // Auto-refresh a cada 2 minutos
-        setInterval(() => {
-            if (currentRadar === 'mendanha' || currentRadar === 'sumare') {
-                loadFrames(currentRadar);
+        // Auto-refresh a cada 2 minutos com fallback automático
+        setInterval(async () => {
+            try {
+                // Sempre verificar status do Mendanha para fallback inteligente
+                const res = await fetch('/api/frames/mendanha');
+                const data = await res.json();
+                const mendanhaDelayMinutes = data.delay_minutes;
+
+                // Fallback automático: Mendanha → Sumaré
+                if (currentRadar === 'mendanha' && mendanhaDelayMinutes !== null && mendanhaDelayMinutes >= DELAY_WARNING_THRESHOLD) {
+                    console.log(`🔄 Fallback automático: Mendanha desatualizado (${mendanhaDelayMinutes} min), trocando para Sumaré`);
+                    showFallbackNotification('fallback', `Radar Mendanha sem atualização há ${mendanhaDelayMinutes} min. Alternando para Sumaré...`);
+                    switchRadar('sumare');
+                    return;
+                }
+
+                // Retorno automático: Sumaré → Mendanha (quando Mendanha normalizar)
+                if (currentRadar === 'sumare' && (mendanhaDelayMinutes === null || mendanhaDelayMinutes < DELAY_WARNING_THRESHOLD)) {
+                    console.log(`🔄 Retorno automático: Mendanha normalizado, voltando ao Mendanha`);
+                    showFallbackNotification('return', 'Radar Mendanha normalizado. Retornando ao Mendanha...');
+                    switchRadar('mendanha');
+                    return;
+                }
+
+                // Atualizar frames do radar atual
+                if (currentRadar === 'mendanha' || currentRadar === 'sumare') {
+                    loadFrames(currentRadar);
+                }
+            } catch (e) {
+                console.error('Erro no auto-refresh:', e);
+                // Em caso de erro, apenas atualizar o radar atual
+                if (currentRadar === 'mendanha' || currentRadar === 'sumare') {
+                    loadFrames(currentRadar);
+                }
             }
         }, 120000);
     </script>
